@@ -4,6 +4,33 @@ import pyrender
 import trimesh
 
 
+def random_perturbation(
+    mesh: trimesh.Trimesh,
+    translation_range: float = 0.02,
+    rotation_range: float = np.pi / 36,
+):
+    """
+    Apply random translation and rotation to the mesh to simulate robotic imprecision.
+
+    :param mesh: The 3D mesh to perturb.
+    :param translation_range: Max translation perturbation (in normalized units).
+    :param rotation_range: Max rotation perturbation (in radians).
+    """
+    # Random translation within the given range
+    translation = np.random.uniform(-translation_range, translation_range, size=3)
+    mesh.apply_translation(translation)
+
+    # Random rotation about the X, Y, Z axes
+    rotation_axis = np.random.normal(size=3)
+    rotation_axis /= np.linalg.norm(rotation_axis)  # Normalize to make it a unit vector
+    rotation_angle = np.random.uniform(-rotation_range, rotation_range)
+    rotation_matrix = trimesh.transformations.rotation_matrix(
+        rotation_angle, rotation_axis
+    )
+
+    mesh.apply_transform(rotation_matrix)
+
+
 def preprocess_mesh(path: str) -> pyrender.Mesh:
     mesh = trimesh.load(path)
     mesh.apply_translation(-mesh.centroid)
@@ -13,10 +40,10 @@ def preprocess_mesh(path: str) -> pyrender.Mesh:
     scale_factor = 1.0 / np.max(bounds[1] - bounds[0])
     mesh.apply_scale(scale_factor)
 
-    if mesh.vertex_normals is None or len(mesh.vertex_normals) == 0:
-        mesh.vertex_normals = mesh.vertex_normals
+    # Apply random perturbation to simulate robotic imprecision
+    random_perturbation(mesh)
 
-    mesh = trimesh.graph.smooth_shade(mesh)
+    # Ensure smooth shading and create a mesh with a flat material
     material = pyrender.MetallicRoughnessMaterial(
         baseColorFactor=[1, 1, 1, 1.0],
         metallicFactor=0.1,
@@ -24,8 +51,9 @@ def preprocess_mesh(path: str) -> pyrender.Mesh:
         smooth=False,
         alphaMode="OPAQUE",
     )
-    mesh = pyrender.Mesh.from_trimesh(mesh, material=material)
-    return mesh
+    pyrender_mesh = pyrender.Mesh.from_trimesh(mesh, material=material)
+
+    return pyrender_mesh
 
 
 def init_cameras() -> Tuple[pyrender.PerspectiveCamera, Tuple[np.ndarray]]:
