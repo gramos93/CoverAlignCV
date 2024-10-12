@@ -8,7 +8,7 @@ def random_perturbation(
     mesh: trimesh.Trimesh,
     translation_range: float = 0.02,
     rotation_range: float = np.pi / 36,
-):
+) -> None:
     """
     Apply random translation and rotation to the mesh to simulate robotic imprecision.
 
@@ -56,6 +56,16 @@ def preprocess_mesh(path: str) -> pyrender.Mesh:
     return pyrender_mesh
 
 
+def preprocess_trimesh(path: str) -> trimesh.Trimesh:
+    mesh = trimesh.load(path)
+    mesh.apply_translation(-mesh.centroid)
+
+    # Scale the model to fit in a unit box
+    bounds = mesh.bounds
+    scale_factor = 1.0 / np.max(bounds[1] - bounds[0])
+    return mesh.apply_scale(scale_factor)
+
+
 def init_cameras() -> Tuple[pyrender.PerspectiveCamera, Tuple[np.ndarray]]:
     # Define camera parameters
     camera = pyrender.PerspectiveCamera(yfov=np.pi / 3.0)
@@ -100,7 +110,7 @@ def init_lights() -> Tuple[pyrender.DirectionalLight, Tuple[np.ndarray]]:
     return directional_light, (top_light_pose, side_light_pose)
 
 
-def render(path: str) -> None:
+def render(path: str) -> list[np.ndarray]:
     mesh = preprocess_mesh(path)
 
     scene = pyrender.Scene(bg_color=np.zeros(4))  # , ambient_light=np.ones(3))
@@ -126,7 +136,6 @@ if __name__ == "__main__":
     from PIL import Image
 
     imgs = render("./assets/3dmodels/couvercle.stl")
-
     img_names = ["top_view.png", "side_view.png"]
     for img, name in zip(imgs, img_names):
         Image.fromarray(img).save(name)

@@ -51,11 +51,11 @@ def detect_cover(processed_image: OpenCVImage) -> FindTheEdges:
 
 def detect_holes_in_cover(
     processed_image: OpenCVImage,
-    result_edges: FindTheEdges
+    result_cover: FindTheEdges
 ) -> FindTheEdges:
     # Create the mask
     mask = np.zeros_like(processed_image.gray)
-    cv2.drawContours(mask, result_edges.contours, -1, (255, 0, 0), thickness=cv2.FILLED)
+    cv2.drawContours(mask, result_cover.contours, -1, (255, 0, 0), thickness=cv2.FILLED)
 
     # Find the contours
     inverted_image = cv2.bitwise_not(processed_image.gray, mask=mask)
