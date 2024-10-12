@@ -9,7 +9,7 @@ occur during fabrication.
 
 ## Project Structure
 ```plaintext
-project/  
+CoverAlignCV/  
 ├── assets/      
 │   └── 3dmodels/  
 │       └── couvercle.stl  
