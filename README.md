@@ -50,3 +50,8 @@ python src/render.py
 ```bash
 python src/detection.py
 ```
+
+3. Simulation & Video recording from stl file.
+```bash
+python src/simulation.py
+```
