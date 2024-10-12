@@ -14,8 +14,9 @@ CoverAlignCV/
 │   └── 3dmodels/  
 │       └── couvercle.stl  
 ├── src/  
-│   ├── render.py  
-│   └── detection.py     
+│   ├── detection.py  
+│   ├── render.py   
+│   └── simulation.py     
 ├── README.md   
 └── requirements.txt  
 ```
