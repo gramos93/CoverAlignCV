@@ -12,7 +12,7 @@ from render import init_cameras, init_lights, random_perturbation, preprocess_tr
 
 
 def simulate_robotic_movement(
-    file_path: str, num_steps=50, output_video="simulation_robotic.mp4"
+    num_steps=50, output_video="simulation_robotic.mp4"
 ) -> None:
     """Simulates robotic movements and records a video of hole position estimation."""
     # Preprocess mesh
@@ -83,7 +83,6 @@ def simulate_robotic_movement(
 if __name__ == "__main__":
     # Simulate robotic movements on the mesh, estimate hole positions and record video
     simulate_robotic_movement(
-        file_path="../assets/3dmodels/couvercle.stl",
         num_steps=100,
         output_video="robotic_simulation.mp4",
     )
