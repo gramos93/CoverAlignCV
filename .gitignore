@@ -163,3 +163,4 @@ cython_debug/
 
 # Project generated files
 **/*.mp4
+**/*.png
