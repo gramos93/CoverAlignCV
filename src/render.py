@@ -110,7 +110,7 @@ def init_lights() -> Tuple[pyrender.DirectionalLight, Tuple[np.ndarray]]:
     )
     side_light_pose = np.array(
         [
-            [0.0, 0.0, 1.0, 10.0],
+            [0.0, 0.0, -1.0, -10.0],
             [0.0, 1.0, 0.0, 0.0],
             [1.0, 0.0, 0.0, 0.0],
             [0.0, 0.0, 0.0, 1.0],
