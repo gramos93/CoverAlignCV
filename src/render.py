@@ -73,11 +73,15 @@ def preprocess_trimesh() -> Tuple[trimesh.Trimesh]:
 
 
 def init_cameras() -> Tuple[pyrender.PerspectiveCamera, Tuple[np.ndarray]]:
+    """
+    Camera frame of reference guide
+    https://pyrender.readthedocs.io/en/latest/examples/cameras.html
+    """
     # Define camera parameters
     camera = pyrender.PerspectiveCamera(yfov=np.pi / 3.0)
     side_camera_pose = np.array(
         [
-            [0.0, 0.0, 1.0, 2.0],
+            [0.0, 0.0, -1.0, -2.0],
             [0.0, 1.0, 0.0, 0.0],
             [1.0, 0.0, 0.0, 0.0],
             [0.0, 0.0, 0.0, 1.0],
