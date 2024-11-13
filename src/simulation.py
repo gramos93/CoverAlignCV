@@ -34,7 +34,9 @@ def simulate_robotic_movement(
     for step in range(num_steps):
         # Apply random perturbation to simulate robotic imprecision
         scene.apply_random_perturbation()
-        color = scene.render(show_cov=True)
+        # This line allow the addition of the cover at some point in the loop.
+        # In this case after step 10.
+        color = scene.render(show_cov=True if step > 10 else False)
 
         # Write the scene image into a video
         color_bgr = cv2.cvtColor(color, cv2.COLOR_RGB2BGR)
