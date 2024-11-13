@@ -33,30 +33,67 @@ SIDE_LIGHT_POSE = np.array([
     [0.0, 0.0, 0.0, 1.0],
 ])
 
+def quaternion_multiply(q1, q2):
+    """
+    Multiply two quaternions.
+
+    :param q1: First quaternion in form [x, y, z, w]
+    :param q2: Second quaternion in form [x, y, z, w]
+    :return: Result quaternion in form [x, y, z, w]
+    """
+    x1, y1, z1, w1 = q1
+    x2, y2, z2, w2 = q2
+
+    return np.array([
+        w1*x2 + x1*w2 + y1*z2 - z1*y2,
+        w1*y2 - x1*z2 + y1*w2 + z1*x2,
+        w1*z2 + x1*y2 - y1*x2 + z1*w2,
+        w1*w2 - x1*x2 - y1*y2 - z1*z2
+    ])
 
 def random_perturbation(
-    mesh: trimesh.Trimesh,
+    node: pyrender.Node,
     translation_range: float = 0.02,
     rotation_range: float = np.pi / 36,
 ) -> None:
     """
-    Apply random translation and rotation to the mesh to simulate robotic imprecision.
+    Apply random translation and rotation to the pyrender node to simulate robotic imprecision.
 
-    :param mesh: The 3D mesh to perturb.
-    :param translation_range: Max translation perturbation (in normalized units).
-    :param rotation_range: Max rotation perturbation (in radians).
+    :param node: The pyrender Node to perturb
+    :param translation_range: Max translation perturbation (in normalized units)
+    :param rotation_range: Max rotation perturbation (in radians)
     """
+    # Random translation
     translation = np.random.uniform(-translation_range, translation_range, size=3)
-    mesh.apply_translation(translation)
+    if node.translation is None:
+        node.translation = translation
+    else:
+        node.translation = node.translation + translation
 
+    # Random rotation
     rotation_axis = np.random.normal(size=3)
     rotation_axis /= np.linalg.norm(rotation_axis)
     rotation_angle = np.random.uniform(-rotation_range, rotation_range)
-    rotation_matrix = trimesh.transformations.rotation_matrix(
-        rotation_angle, rotation_axis
-    )
-    mesh.apply_transform(rotation_matrix)
 
+    # Convert axis-angle to quaternion
+    # Using half angle for quaternion calculation
+    half_angle = rotation_angle / 2.0
+    qx = rotation_axis[0] * np.sin(half_angle)
+    qy = rotation_axis[1] * np.sin(half_angle)
+    qz = rotation_axis[2] * np.sin(half_angle)
+    qw = np.cos(half_angle)
+
+    # Normalize quaternion
+    quaternion = np.array([qx, qy, qz, qw])
+    quaternion /= np.linalg.norm(quaternion)
+
+    if node.rotation is None:
+        node.rotation = quaternion
+    else:
+        # Combine with existing rotation using quaternion multiplication
+        current_quat = node.rotation
+        new_quat = quaternion_multiply(quaternion, current_quat)
+        node.rotation = new_quat
 
 @dataclass
 class SceneConfig:
@@ -144,6 +181,15 @@ class SceneHandler:
         if self.light_node:
             self.scene.remove_node(self.light_node)
         self.light_node = self.scene.add(self.light, pose=pose)
+
+    def apply_random_perturbation(
+        self,
+        translation_range: float = 0.02,
+        rotation_range: float = np.pi / 36,
+    ):
+        """Apply random perturbation to the meshes"""
+        if self.cov_mesh_node:
+            random_perturbation(self.cov_mesh_node, translation_range, rotation_range)
 
     def render(self, show_cov: bool = True) -> np.ndarray:
         """Render the scene"""

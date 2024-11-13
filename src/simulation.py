@@ -8,38 +8,23 @@ from detection import (
     OpenCVImage,
     detect_cercles,
 )
-from render import init_cameras, init_lights, random_perturbation, preprocess_trimesh
-
+from render import (
+    SceneHandler,
+    COUVERCLE_PATH,
+    BOITIER_PATH,
+    TOP_CAMERA_POSE,
+    SIDE_CAMERA_POSE,
+    TOP_LIGHT_POSE,
+    SIDE_LIGHT_POSE,
+)
 
 def simulate_robotic_movement(
     num_steps=50, output_video="simulation_robotic.mp4"
 ) -> None:
     """Simulates robotic movements and records a video of hole position estimation."""
-    # Preprocess mesh
-    mesh, rad_mesh = preprocess_trimesh()
-
-    # Create a scene, renderer and material
-    scene = pyrender.Scene(bg_color=np.zeros(4))
-    renderer = pyrender.OffscreenRenderer(viewport_width=640, viewport_height=480)
-    material = pyrender.MetallicRoughnessMaterial(
-        baseColorFactor=[1, 1, 1, 1.0],
-        metallicFactor=0.1,
-        roughnessFactor=0.1,
-        smooth=False,
-        alphaMode="OPAQUE",
-    )
-
-    # Add light on scene
-    light, light_poses = init_lights()
-    scene.add(light, pose=light_poses[0])
-
-    # Add camera on scene
-    camera, cam_poses = init_cameras()
-    scene.add(camera, pose=cam_poses[0])
-
-    # Add radiator to scene
-    pyrender_rad_mesh = pyrender.Mesh.from_trimesh(rad_mesh, material=material)
-    scene.add(pyrender_rad_mesh)
+    scene = SceneHandler.from_stl_files(COUVERCLE_PATH, BOITIER_PATH)
+    scene.set_camera_pose(TOP_CAMERA_POSE)
+    scene.set_light_pose(TOP_LIGHT_POSE)
 
     # Video file setup
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
@@ -48,16 +33,11 @@ def simulate_robotic_movement(
     # Simulation of robotic movements
     for step in range(num_steps):
         # Apply random perturbation to simulate robotic imprecision
-        random_perturbation(mesh)
-
-        # Add mesh on scene
-        pyrender_mesh = pyrender.Mesh.from_trimesh(mesh, material=material)
-        mesh_node = scene.add(pyrender_mesh)
+        scene.apply_random_perturbation()
+        color = scene.render(show_cov=True)
 
         # Write the scene image into a video
-        color, _ = renderer.render(scene)
         color_bgr = cv2.cvtColor(color, cv2.COLOR_RGB2BGR)
-
         processed_image = OpenCVImage(
             np_image=color,
             cv_image=color_bgr,
@@ -72,10 +52,9 @@ def simulate_robotic_movement(
             break
 
         time.sleep(0.2)
-        scene.remove_node(mesh_node)
 
     # Post-simulation cleaning
-    renderer.delete()
+    scene.cleanup()
     video_writer.release()
     cv2.destroyAllWindows()
 
