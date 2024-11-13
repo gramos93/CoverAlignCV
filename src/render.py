@@ -99,9 +99,9 @@ def random_perturbation(
 class SceneConfig:
     viewport_width: int = 640
     viewport_height: int = 480
-    bg_color: np.ndarray = np.zeros(4)
+    bg_color: Tuple = (0.0, 0.0, 0.0, 0.0)
     light_intensity: float = 4.0
-    light_color: np.ndarray = np.ones(3)
+    light_color: Tuple = (1.0, 1.0, 1.0)
     camera_fov: float = np.pi / 3.0
 
 class SceneHandler:
