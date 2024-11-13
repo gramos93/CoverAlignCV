@@ -1,11 +1,37 @@
-from typing import Tuple
+from typing import Tuple, Optional
 import numpy as np
 import pyrender
 import trimesh
+from dataclasses import dataclass
+
 
 COUVERCLE_PATH = "./assets/3dmodels/couvercle.stl"
 BOITIER_PATH = "./assets/3dmodels/boitier.stl"
 ORIGIN_OFFSET = np.array([651.86, 573.76, -2_894.40])
+TOP_CAMERA_POSE = np.array([
+    [0.0, 1.0, 0.0, 0.0],
+    [0.0, 0.0, 1.0, 2.0],
+    [1.0, 0.0, 0.0, 0.0],
+    [0.0, 0.0, 0.0, 1.0],
+])
+SIDE_CAMERA_POSE = np.array([
+    [0.0, 0.0, -1.0, -2.0],
+    [0.0, 1.0, 0.0, 0.0],
+    [1.0, 0.0, 0.0, 0.0],
+    [0.0, 0.0, 0.0, 1.0],
+])
+TOP_LIGHT_POSE = np.array([
+    [0.0, 1.0, 0.0, 0.0],
+    [0.0, 0.0, 1.0, 10.0],
+    [1.0, 0.0, 0.0, 0.0],
+    [0.0, 0.0, 0.0, 1.0],
+])
+SIDE_LIGHT_POSE = np.array([
+    [0.0, 0.0, -1.0, -10.0],
+    [0.0, 1.0, 0.0, 0.0],
+    [1.0, 0.0, 0.0, 0.0],
+    [0.0, 0.0, 0.0, 1.0],
+])
 
 
 def random_perturbation(
@@ -20,133 +46,139 @@ def random_perturbation(
     :param translation_range: Max translation perturbation (in normalized units).
     :param rotation_range: Max rotation perturbation (in radians).
     """
-    # Random translation within the given range
     translation = np.random.uniform(-translation_range, translation_range, size=3)
     mesh.apply_translation(translation)
 
-    # Random rotation about the X, Y, Z axes
     rotation_axis = np.random.normal(size=3)
-    rotation_axis /= np.linalg.norm(rotation_axis)  # Normalize to make it a unit vector
+    rotation_axis /= np.linalg.norm(rotation_axis)
     rotation_angle = np.random.uniform(-rotation_range, rotation_range)
     rotation_matrix = trimesh.transformations.rotation_matrix(
         rotation_angle, rotation_axis
     )
-
     mesh.apply_transform(rotation_matrix)
 
 
-def preprocess_meshes() -> pyrender.Mesh:
-    mesh, rad_mesh = preprocess_trimesh()
+@dataclass
+class SceneConfig:
+    viewport_width: int = 640
+    viewport_height: int = 480
+    bg_color: np.ndarray = np.zeros(4)
+    light_intensity: float = 4.0
+    light_color: np.ndarray = np.ones(3)
+    camera_fov: float = np.pi / 3.0
 
-    # Apply random perturbation to simulate robotic imprecision
-    random_perturbation(mesh)
+class SceneHandler:
+    def __init__(self, config: SceneConfig = SceneConfig()):
+        self.config = config
+        self.scene = pyrender.Scene(bg_color=config.bg_color)
+        self.renderer = pyrender.OffscreenRenderer(
+            viewport_width=config.viewport_width,
+            viewport_height=config.viewport_height
+        )
 
-    # Ensure smooth shading and create a mesh with a flat material
-    material = pyrender.MetallicRoughnessMaterial(
-        baseColorFactor=[1, 1, 1, 1.0],
-        metallicFactor=0.1,
-        roughnessFactor=0.1,
-        smooth=False,
-        alphaMode="OPAQUE",
-    )
-    pyrender_mesh = pyrender.Mesh.from_trimesh(mesh, material=material)
-    pyrender_rad_mesh = pyrender.Mesh.from_trimesh(rad_mesh, material=material)
+        self.cov_mesh_node: Optional[pyrender.Node] = None
+        self.rad_mesh_node: Optional[pyrender.Node] = None
+        self.camera_node: Optional[pyrender.Node] = None
+        self.light_node: Optional[pyrender.Node] = None
 
-    return pyrender_mesh, pyrender_rad_mesh
+        self.camera = pyrender.PerspectiveCamera(yfov=config.camera_fov)
+        self.light = pyrender.DirectionalLight(
+            color=config.light_color,
+            intensity=config.light_intensity
+        )
 
+    @classmethod
+    def from_stl_files(
+        cls,
+        mesh_path: str,
+        rad_mesh_path: str,
+        config: SceneConfig = SceneConfig()
+    ) -> 'SceneHandler':
+        handler = cls(config)
+        handler.load_meshes(mesh_path, rad_mesh_path)
+        return handler
 
-def preprocess_trimesh() -> Tuple[trimesh.Trimesh]:
-    mesh = trimesh.load(COUVERCLE_PATH)
-    rad_mesh = trimesh.load(BOITIER_PATH)
+    def load_meshes(self, mesh_path: str, rad_mesh_path: str) -> None:
+        """Load and preprocess mesh files"""
+        cov_mesh = trimesh.load(mesh_path)
+        rad_mesh = trimesh.load(rad_mesh_path)
 
-    # Scale the model to fit in a unit box
-    bounds = mesh.bounds
-    scale_factor = 1.0 / np.max(bounds[1] - bounds[0])
+        # Preprocess meshes
+        self._preprocess_meshes(cov_mesh, rad_mesh)
+        self._create_pyrender_meshes(cov_mesh, rad_mesh)
 
-    mesh.apply_translation(ORIGIN_OFFSET)
-    rad_mesh.apply_translation(ORIGIN_OFFSET)
+    def _preprocess_meshes(self, cov_mesh: trimesh.Trimesh, rad_mesh: trimesh.Trimesh) -> None:
+        """Apply transformations to meshes"""
 
-    mesh.apply_scale(scale_factor)
-    rad_mesh.apply_scale(scale_factor)
+        # Scale to unit box
+        bounds = cov_mesh.bounds
+        scale_factor = 1.0 / np.max(bounds[1] - bounds[0])
 
-    return mesh, rad_mesh
+        for m in [cov_mesh, rad_mesh]:
+            m.apply_translation(ORIGIN_OFFSET)
+            m.apply_scale(scale_factor)
 
+    def _create_pyrender_meshes(self, cov_mesh: trimesh.Trimesh, rad_mesh: trimesh.Trimesh) -> None:
+        """Create pyrender meshes with materials"""
+        material = pyrender.MetallicRoughnessMaterial(
+            baseColorFactor=[1, 1, 1, 1.0],
+            metallicFactor=0.1,
+            roughnessFactor=0.1,
+            smooth=False,
+            alphaMode="OPAQUE"
+        )
+        pyrender_cov_mesh = pyrender.Mesh.from_trimesh(cov_mesh, material=material)
+        pyrender_rad_mesh = pyrender.Mesh.from_trimesh(rad_mesh, material=material)
 
-def init_cameras() -> Tuple[pyrender.PerspectiveCamera, Tuple[np.ndarray]]:
-    """
-    Camera frame of reference guide
-    https://pyrender.readthedocs.io/en/latest/examples/cameras.html
-    """
-    # Define camera parameters
-    camera = pyrender.PerspectiveCamera(yfov=np.pi / 3.0)
-    side_camera_pose = np.array(
-        [
-            [0.0, 0.0, -1.0, -2.0],
-            [0.0, 1.0, 0.0, 0.0],
-            [1.0, 0.0, 0.0, 0.0],
-            [0.0, 0.0, 0.0, 1.0],
-        ]
-    )
-    top_camera_pose = np.array(
-        [
-            [0.0, 1.0, 0.0, 0.0],
-            [0.0, 0.0, 1.0, 2.0],
-            [1.0, 0.0, 0.0, 0.0],
-            [0.0, 0.0, 0.0, 1.0],
-        ]
-    )
+        self.cov_mesh_node = self.scene.add(pyrender_cov_mesh)
+        self.rad_mesh_node = self.scene.add(pyrender_rad_mesh)
 
-    return camera, (top_camera_pose, side_camera_pose)
+    def set_camera_pose(self, pose: np.ndarray) -> None:
+        """Update camera position"""
+        if self.camera_node:
+            self.scene.remove_node(self.camera_node)
+        self.camera_node = self.scene.add(self.camera, pose=pose)
 
+    def set_light_pose(self, pose: np.ndarray) -> None:
+        """Update light position"""
+        if self.light_node:
+            self.scene.remove_node(self.light_node)
+        self.light_node = self.scene.add(self.light, pose=pose)
 
-def init_lights() -> Tuple[pyrender.DirectionalLight, Tuple[np.ndarray]]:
-    top_light_pose = np.array(
-        [
-            [0.0, 1.0, 0.0, 0.0],
-            [0.0, 0.0, 1.0, 10.0],
-            [1.0, 0.0, 0.0, 0.0],
-            [0.0, 0.0, 0.0, 1.0],
-        ]
-    )
-    side_light_pose = np.array(
-        [
-            [0.0, 0.0, -1.0, -10.0],
-            [0.0, 1.0, 0.0, 0.0],
-            [1.0, 0.0, 0.0, 0.0],
-            [0.0, 0.0, 0.0, 1.0],
-        ]
-    )
-    directional_light = pyrender.DirectionalLight(color=np.ones(3), intensity=4.0)
-    return directional_light, (top_light_pose, side_light_pose)
+    def render(self, show_cov: bool = True) -> np.ndarray:
+        """Render the scene"""
+        if not show_cov and self.cov_mesh_node:
+            self.scene.remove_node(self.cov_mesh_node)
 
+        color, _ = self.renderer.render(self.scene)
 
-def render() -> list[np.ndarray]:
-    mesh, rad_mesh = preprocess_meshes()
+        if not show_cov and self.cov_mesh_node:
+            self.scene.add_node(self.cov_mesh_node)
 
-    scene = pyrender.Scene(bg_color=np.zeros(4))  # , ambient_light=np.ones(3))
-    renderer = pyrender.OffscreenRenderer(viewport_width=640, viewport_height=480)
+        return color
 
-    scene.add(mesh)
-    scene.add(rad_mesh)
-    camera, cam_poses = init_cameras()
-    light, light_poses = init_lights()
-
-    renders = []
-    for cam_pose, light_pose in zip(cam_poses, light_poses):
-        scene.add(light, pose=light_pose)
-        cam_node = scene.add(camera, pose=cam_pose)
-        color_side, _ = renderer.render(scene)
-        renders.append(color_side)
-        scene.remove_node(cam_node)
-
-    renderer.delete()
-    return renders
-
+    def cleanup(self):
+        """Clean up resources"""
+        self.renderer.delete()
 
 if __name__ == "__main__":
     from PIL import Image
 
-    imgs = render()
-    img_names = ["top_view.png", "side_view.png"]
-    for img, name in zip(imgs, img_names):
-        Image.fromarray(img).save(name)
+    config = SceneConfig(
+        viewport_width=640,
+        viewport_height=480,
+        light_intensity=4.0
+    )
+    handler = SceneHandler.from_stl_files(
+        mesh_path="./assets/3dmodels/couvercle.stl",
+        rad_mesh_path="./assets/3dmodels/boitier.stl",
+        config=config
+    )
+    handler.set_camera_pose(TOP_CAMERA_POSE)
+    handler.set_light_pose(TOP_LIGHT_POSE)
+    with_cov = handler.render(show_cov=True)
+    without_cov = handler.render(show_cov=False)
+
+    handler.cleanup()
+    Image.fromarray(with_cov).save("with_mesh.png")
+    Image.fromarray(without_cov).save("without_mesh.png")
