@@ -2,26 +2,24 @@ import numpy as np
 import cv2
 from dataclasses import dataclass
 from typing import Sequence
+from preprocessing import (
+    display,
+    image_preprocessing,
+    OpenCVImage
+)
+from render import (
+    RADIATEUR_WITH_MESH_PATH,
+    RADIATEUR_WITHOUT_MESH_PATH
+)
 
 
+COVER_EDGES_PATH   = r"./outputs/cover_edges_with_mesh.png"
+CIRCLES_EDGES_PATH = r"./outputs/circle_edges_with_mesh.png"
+HOLE_EDGES_PATH    = r"./outputs/hole_edges_with_mesh.png"
+RECTANGLE_EDGES_PATH = r"./outputs/rectangle_edges_with_mesh.png"
+CIRCLES_IN_RECTANGLE_PATH = r"./outputs/circle_in_rectangle_with_mesh.png"
+radiator_corner = (174, 143)
 
-@dataclass
-class OpenCVImage:
-    np_image: np.ndarray
-    cv_image: np.ndarray
-    gray: np.ndarray
-
-
-def image_preprocessing(image_path: str) -> OpenCVImage:
-    """Convert an array image from RGB to BGR format and then to grayscale"""
-    np_image = np.array(image_path)
-    cv_image = cv2.imread(image_path)
-    gray = cv2.cvtColor(cv_image, cv2.COLOR_BGR2GRAY)
-    return OpenCVImage(
-        np_image=np_image,
-        cv_image=cv_image,
-        gray=gray
-    )
 
 
 @dataclass
@@ -31,6 +29,7 @@ class FindTheEdges:
 
 
 def detect_cover(processed_image: OpenCVImage) -> FindTheEdges:
+    """Detect and draw the radiator edges in the image."""
     # Find the contours
     inverted_image = cv2.bitwise_not(processed_image.gray)
     _, thresh = cv2.threshold(inverted_image, 100, 255, cv2.THRESH_BINARY_INV)
@@ -53,6 +52,7 @@ def detect_holes_in_cover(
     processed_image: OpenCVImage,
     result_cover: FindTheEdges
 ) -> FindTheEdges:
+    """Detect and draw the holes edges from the radiator area."""
     # Create the mask
     mask = np.zeros_like(processed_image.gray)
     cv2.drawContours(mask, result_cover.contours, -1, (255, 0, 0), thickness=cv2.FILLED)
@@ -62,7 +62,7 @@ def detect_holes_in_cover(
     _, thresh = cv2.threshold(inverted_image, 128, 255, cv2.THRESH_BINARY)
     contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-    # Draw the edges
+    # Draw the contours
     image = np.copy(processed_image.cv_image)
     for contour in contours:
         area = cv2.contourArea(contour)
@@ -83,12 +83,12 @@ class FindTheCercles:
 
 
 def detect_cercles(processed_image: OpenCVImage) -> FindTheCercles:
-    # Detects circle shaped holes
+    """Detect and draw the holes in the image."""
+    # Detect the circle shaped holes
     circles = cv2.HoughCircles(
         processed_image.gray, cv2.HOUGH_GRADIENT, dp=1.2, minDist=20,
         param1=50, param2=20, minRadius=5, maxRadius=10
     )
-
     # Draw circles shaped holes
     centers = []
     image = np.copy(processed_image.cv_image)
@@ -96,7 +96,7 @@ def detect_cercles(processed_image: OpenCVImage) -> FindTheCercles:
         circles = np.round(circles[0, :]).astype("int")
         for (x, y, r) in circles:
             centers.append((x, y, r))
-            cv2.circle(image, (x, y), r, (0, 255, 0), 1)
+            cv2.circle(image, (x, y), r, (255, 0, 0), 2)
             cv2.circle(image, (x, y), 1, (0, 0, 255), -1)
     else:
         print("Aucun cercle détecté.")
@@ -108,29 +108,95 @@ def detect_cercles(processed_image: OpenCVImage) -> FindTheCercles:
     )
 
 
-def display(image, title="Detected Holes"):
-    cv2.imshow(title, image)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
+@dataclass
+class FindTheRectangle:
+    rectangles: list[tuple[int, int, int, int]]
+    centers: list[tuple[int, int]]
+    image: np.ndarray
+
+
+def detect_rectangle(processed_image: OpenCVImage) -> FindTheRectangle:
+    """Detect and draw the rectangle around the radiator"""
+    new_image = np.copy(processed_image.cv_image)
+    _, bin_image = cv2.threshold(processed_image.gray, 127, 255, cv2.THRESH_BINARY)
+    radiator_contours, _ = cv2.findContours(bin_image, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    rectangles, centers = [], []
+    for contour in radiator_contours:
+        x, y, w, h = cv2.boundingRect(contour)
+        rectangles.append((x, y, w, h))
+        centers.append((x + w // 2, y + h // 2))
+        cv2.rectangle(new_image, (x, y), (x + w, y + h), (0, 255, 0), 2)
+
+    return FindTheRectangle(
+        rectangles=rectangles,
+        centers=centers,
+        image=new_image
+    )
+
+
+def detect_cover_in_radiator(processed_image: OpenCVImage) -> FindTheCercles:
+    """Detect and draw the holes from the cover area."""
+    new_image = np.copy(processed_image.cv_image)
+
+    # Define the cover area
+    cover_area, cover_mask = define_and_mask_area(processed_image.gray, w=170)
+    x, y, w, h = cover_area
+    cv2.rectangle(new_image, (x, y), (x+w, y+h), (0, 255, 0), 2)
+    masked_image = cv2.bitwise_and(processed_image.gray, processed_image.gray, mask=cover_mask)
+
+    # Detect and draw the holes from the cover area
+    circles = cv2.HoughCircles(masked_image, cv2.HOUGH_GRADIENT, dp=1.2, minDist=20, param1=50, param2=20, minRadius=5, maxRadius=10)
+    centers = []
+    if circles is not None:
+        circles = np.round(circles[0, :]).astype("int")
+        for (x, y, r)  in circles:
+            centers.append((x, y, r))
+            cv2.circle(new_image, (x, y), r, (255, 0, 0), 2)
+            cv2.circle(new_image, (x, y), 1, (0, 0, 255), -1)
+    else:
+        print("Aucun cercle détecté.")
+
+    return FindTheCercles(
+        circles=circles,
+        centers=centers,
+        image=new_image
+    )
+
+
+def define_and_mask_area(image, x=173, y=142, w=467, h=224) -> tuple[
+    tuple[int, int, int, int], tuple[int, int, int, int]]:
+    """Define an area of the image and its mask."""
+    area = (x, y, w, h)
+    mask = np.zeros_like(image, dtype=np.uint8)
+    mask[y:y + h, x:x + w] = 255
+    return area, mask
 
 
 
 if __name__ == "__main__":
     # Preprocessing
-    img_path = r"top_view.png"
-    img = image_preprocessing(img_path)
+    img = image_preprocessing(RADIATEUR_WITH_MESH_PATH)
 
     # Detect cover edges
     cover_result = detect_cover(img)
     display(cover_result.image, "Detects the cover")
-    cv2.imwrite(str("cover_edges_" + img_path), cover_result.image)
+    # cv2.imwrite(COVER_EDGES_PATH, cover_result.image)
 
     # Detect hole edges
     hole_result = detect_holes_in_cover(img, cover_result)
     display(hole_result.image, "Detects the holes")
-    cv2.imwrite(str("hole_edges_" + img_path), hole_result.image)
+    # cv2.imwrite(HOLE_EDGES_PATH, hole_result.image)
 
     # Detect cercle edges
     cercle_result = detect_cercles(img)
     display(cercle_result.image, "Detects the cercles")
-    cv2.imwrite(str("circle_edges_" + img_path), cercle_result.image)
+    # cv2.imwrite(CIRCLES_EDGES_PATH, cercle_result.image)
+
+    # Detect and draw the rectangle around the radiator
+    rectangle_result = detect_rectangle(img)
+    display(rectangle_result.image, "Detects the rectangle")
+    #cv2.imwrite(RECTANGLE_EDGES_PATH, rectangle_result.image)
+
+    cercles_in_rectangle_result = detect_cover_in_radiator(img)
+    display(cercles_in_rectangle_result.image, "Detects the holes in the cover")
+    # cv2.imwrite(CIRCLES_IN_RECTANGLE_PATH, cercles_in_rectangle_result.image)

@@ -5,8 +5,10 @@ import trimesh
 from dataclasses import dataclass
 
 
-COUVERCLE_PATH = "./assets/3dmodels/couvercle.stl"
-BOITIER_PATH = "./assets/3dmodels/boitier.stl"
+COUVERCLE_PATH = "../assets/3dmodels/couvercle.stl"
+BOITIER_PATH = "../assets/3dmodels/boitier.stl"
+RADIATEUR_WITH_MESH_PATH = r"./outputs/with_mesh.png"
+RADIATEUR_WITHOUT_MESH_PATH = r"./outputs/without_mesh.png"
 ORIGIN_OFFSET = np.array([651.86, 573.76, -2_894.40])
 TOP_CAMERA_POSE = np.array([
     [0.0, 1.0, 0.0, 0.0],
@@ -216,8 +218,8 @@ if __name__ == "__main__":
         light_intensity=4.0
     )
     handler = SceneHandler.from_stl_files(
-        mesh_path="./assets/3dmodels/couvercle.stl",
-        rad_mesh_path="./assets/3dmodels/boitier.stl",
+        mesh_path=COUVERCLE_PATH,
+        rad_mesh_path=BOITIER_PATH,
         config=config
     )
     handler.set_camera_pose(TOP_CAMERA_POSE)
@@ -226,5 +228,5 @@ if __name__ == "__main__":
     without_cov = handler.render(show_cov=False)
 
     handler.cleanup()
-    Image.fromarray(with_cov).save("with_mesh.png")
-    Image.fromarray(without_cov).save("without_mesh.png")
+    Image.fromarray(with_cov).save(RADIATEUR_WITH_MESH_PATH)
+    Image.fromarray(without_cov).save(RADIATEUR_WITHOUT_MESH_PATH)

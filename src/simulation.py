@@ -7,6 +7,7 @@ import pyrender
 from detection import (
     OpenCVImage,
     detect_cercles,
+    detect_cover_in_radiator,
 )
 from render import (
     SceneHandler,
@@ -17,6 +18,10 @@ from render import (
     TOP_LIGHT_POSE,
     SIDE_LIGHT_POSE,
 )
+
+SIMULATION_PATH = r"./outputs/robotic_simulation.mp4"
+
+
 
 def simulate_robotic_movement(
     num_steps=50, output_video="simulation_robotic.mp4"
@@ -45,7 +50,7 @@ def simulate_robotic_movement(
             cv_image=color_bgr,
             gray=cv2.cvtColor(color_bgr, cv2.COLOR_BGR2GRAY),
         )
-        circle_result = detect_cercles(processed_image)
+        circle_result = detect_cover_in_radiator(processed_image)
         video_writer.write(circle_result.image)
 
         # Display simulation in real time
@@ -65,5 +70,5 @@ if __name__ == "__main__":
     # Simulate robotic movements on the mesh, estimate hole positions and record video
     simulate_robotic_movement(
         num_steps=100,
-        output_video="robotic_simulation.mp4",
+        output_video=SIMULATION_PATH,
     )
