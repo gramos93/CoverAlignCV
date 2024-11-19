@@ -134,7 +134,7 @@ def detect_rectangle(processed_image: OpenCVImage) -> FindTheRectangle:
     )
 
 
-def detect_cover_in_radiator(processed_image: OpenCVImage) -> FindTheCercles:
+def detect_cercles_in_cover_area(processed_image: OpenCVImage) -> FindTheCercles:
     """Detect and draw the holes from the cover area."""
     new_image = np.copy(processed_image.cv_image)
 
@@ -197,6 +197,6 @@ if __name__ == "__main__":
     display(rectangle_result.image, "Detects the rectangle")
     #cv2.imwrite(RECTANGLE_EDGES_PATH, rectangle_result.image)
 
-    cercles_in_rectangle_result = detect_cover_in_radiator(img)
+    cercles_in_rectangle_result = detect_cercles_in_cover_area(img)
     display(cercles_in_rectangle_result.image, "Detects the holes in the cover")
     # cv2.imwrite(CIRCLES_IN_RECTANGLE_PATH, cercles_in_rectangle_result.image)

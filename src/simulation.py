@@ -1,13 +1,10 @@
 import time
-
 import cv2
-import numpy as np
-import pyrender
 
 from detection import (
     OpenCVImage,
     detect_cercles,
-    detect_cover_in_radiator,
+    detect_cercles_in_cover_area,
 )
 from render import (
     SceneHandler,
@@ -50,11 +47,11 @@ def simulate_robotic_movement(
             cv_image=color_bgr,
             gray=cv2.cvtColor(color_bgr, cv2.COLOR_BGR2GRAY),
         )
-        circle_result = detect_cover_in_radiator(processed_image)
-        video_writer.write(circle_result.image)
+        cercle_result = detect_cercles_in_cover_area(processed_image)
+        video_writer.write(cercle_result.image)
 
         # Display simulation in real time
-        cv2.imshow("Simulated Robotic Movement", circle_result.image)
+        cv2.imshow("Simulated Robotic Movement", cercle_result.image)
         if cv2.waitKey(10) & 0xFF == ord("q"):
             break
 
