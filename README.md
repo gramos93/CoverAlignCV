@@ -12,6 +12,7 @@ occur during fabrication.
 CoverAlignCV/  
 ├── assets/      
 │   └── 3dmodels/  
+│       ├── boitier.stl  
 │       └── couvercle.stl  
 ├── src/  
 │   ├── detection.py  
