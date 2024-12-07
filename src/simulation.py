@@ -1,3 +1,4 @@
+from pathlib import Path
 import time
 import cv2
 
@@ -10,15 +11,15 @@ from render import (
     SceneHandler,
     COUVERCLE_PATH,
     BOITIER_PATH,
+    OUTPUT_PATH,
     TOP_CAMERA_POSE,
     SIDE_CAMERA_POSE,
     TOP_LIGHT_POSE,
     SIDE_LIGHT_POSE,
 )
 
-TOP_SIMULATION_PATH = r"robotic_top_simulation.mp4"
-SIDE_SIMULATION_PATH = r"robotic_side_simulation.mp4"
-
+TOP_SIMULATION_PATH = Path(OUTPUT_PATH / "robotic_top_simulation.mp4")
+SIDE_SIMULATION_PATH = Path(OUTPUT_PATH / "robotic_side_simulation.mp4")
 
 
 
@@ -42,7 +43,6 @@ def simulate_robotic_movement(
         # Apply random perturbation to simulate robotic imprecision
         scene.apply_random_perturbation()
         # This line allow the addition of the cover at some point in the loop.
-        # In this case after step 10.
         color = scene.render(show_cov=True if step > 10 else False)
 
         # Write the scene image into a video
@@ -74,5 +74,5 @@ if __name__ == "__main__":
         num_steps=100,
         camera_pose=SIDE_CAMERA_POSE,
         light_pose=SIDE_LIGHT_POSE,
-        output_video=SIDE_SIMULATION_PATH,
+        output_video=str(SIDE_SIMULATION_PATH),
     )
