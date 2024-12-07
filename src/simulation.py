@@ -16,17 +16,22 @@ from render import (
     SIDE_LIGHT_POSE,
 )
 
-SIMULATION_PATH = r"./outputs/robotic_simulation.mp4"
+TOP_SIMULATION_PATH = r"robotic_top_simulation.mp4"
+SIDE_SIMULATION_PATH = r"robotic_side_simulation.mp4"
+
 
 
 
 def simulate_robotic_movement(
-    num_steps=50, output_video="simulation_robotic.mp4"
+    num_steps=50,
+    camera_pose=TOP_CAMERA_POSE,
+    light_pose=TOP_LIGHT_POSE,
+    output_video="simulation_robotic.mp4"
 ) -> None:
     """Simulates robotic movements and records a video of hole position estimation."""
     scene = SceneHandler.from_stl_files(COUVERCLE_PATH, BOITIER_PATH)
-    scene.set_camera_pose(TOP_CAMERA_POSE)
-    scene.set_light_pose(TOP_LIGHT_POSE)
+    scene.set_camera_pose(camera_pose)
+    scene.set_light_pose(light_pose)
 
     # Video file setup
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
@@ -67,5 +72,7 @@ if __name__ == "__main__":
     # Simulate robotic movements on the mesh, estimate hole positions and record video
     simulate_robotic_movement(
         num_steps=100,
-        output_video=SIMULATION_PATH,
+        camera_pose=SIDE_CAMERA_POSE,
+        light_pose=SIDE_LIGHT_POSE,
+        output_video=SIDE_SIMULATION_PATH,
     )
