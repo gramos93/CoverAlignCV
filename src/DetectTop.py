@@ -16,7 +16,7 @@ image = cv2.imread(image_path)
 if image is None:
     print(f"Erreur lors du chargement de l'image a l'emplacement: {image_path}")
 else:
-    # Définir les zones de recherche
+    # Définir les zones_pour_image_de_cote de recherche
     zones_recherche = [(130, 500, 90, 700), (190, 1100, 800, 100), (500, 550, 125, 125)]  # Ajout de la troisième zone
     image_zones = image.copy()
 

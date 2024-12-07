@@ -1,7 +1,14 @@
 import cv2
 import numpy as np
 
-from DetectTop import VUE_DESSUS_PATH, VUE_COTE_PATH
+from DetectTop import VUE_DESSUS_PATH
+
+# Définir la troisième zone de recherche (x, y, largeur, hauteur)
+zones_pour_image_de_dessus = [
+    (130, 500, 90, 700),
+    (190, 1100, 800, 100),
+    (500, 550, 125, 125)
+ ]  # Ajout de la troisième zone
 
 
 # Fonction pour afficher l'image
@@ -15,19 +22,16 @@ def afficher_image(titre, image):
     cv2.destroyAllWindows()
 
 
-# Charger l'image
-image_path = VUE_DESSUS_PATH
-image = cv2.imread(image_path)
+def detecter_les_zones_dans_image_top(image_path, zones_recherche):
+    # Charger et verifier le chargement de l'image
+    image = cv2.imread(image_path)
+    if image is None:
+        print(f"Erreur lors du chargement de l'image à l'emplacement: {image_path}")
+        return
 
-# Vérification du chargement de l'image
-if image is None:
-    print(f"Erreur lors du chargement de l'image à l'emplacement: {image_path}")
-else:
-    # Définir les zones de recherche
-    zones_recherche = [(130, 500, 90, 700), (190, 1100, 800, 100), (500, 550, 125, 125)]  # Ajout de la troisième zone
     image_zones = image.copy()
 
-    # Tracer les rectangles pour les zones de recherche
+    # Tracer les rectangles pour les zones_pour_image_de_cote de recherche
     for (x, y, w, h) in zones_recherche:
         cv2.rectangle(image_zones, (x, y), (x + w, y + h), (0, 255, 0), 2)
     afficher_image("Zones de recherche", image_zones)
@@ -87,3 +91,7 @@ else:
         cv2.circle(image_zones, intersection, 5, (255, 0, 0), -1)
 
     afficher_image("Resultat final", image_zones)
+
+
+if __name__ == '__main__':
+    detecter_les_zones_dans_image_top(VUE_DESSUS_PATH, zones_pour_image_de_dessus)

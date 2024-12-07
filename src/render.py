@@ -1,5 +1,4 @@
 from typing import Tuple, Optional
-from pathlib import Path
 import numpy as np
 import pyrender
 import trimesh
@@ -10,9 +9,9 @@ from dataclasses import dataclass
 COUVERCLE_PATH = "../assets/3dmodels/couvercle.stl"
 BOITIER_PATH = "../assets/3dmodels/boitier.stl"
 
-OUTPUT_PATH = Path("./outputs")
-RADIATEUR_WITH_MESH_PATH = Path("with_mesh.png")
-RADIATEUR_WITHOUT_MESH_PATH = Path("without_mesh.png")
+OUTPUT_PATH = r"./outputs"
+RADIATEUR_WITH_MESH_PATH = f"{OUTPUT_PATH}/with_mesh.png"
+RADIATEUR_WITHOUT_MESH_PATH = f"{OUTPUT_PATH}/without_mesh.png"
 
 ORIGIN_OFFSET = np.array([651.86, 573.76, -2_894.40])
 TOP_CAMERA_POSE = np.array([

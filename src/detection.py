@@ -8,16 +8,16 @@ from preprocessing import (
     OpenCVImage
 )
 from render import (
+    OUTPUT_PATH,
     RADIATEUR_WITH_MESH_PATH,
-    RADIATEUR_WITHOUT_MESH_PATH
+    RADIATEUR_WITHOUT_MESH_PATH,
 )
 
-
-COVER_EDGES_PATH   = r"./outputs/cover_edges_with_mesh.png"
-CIRCLES_EDGES_PATH = r"./outputs/circle_edges_with_mesh.png"
-HOLE_EDGES_PATH    = r"./outputs/hole_edges_with_mesh.png"
-RECTANGLE_EDGES_PATH = r"./outputs/rectangle_edges_with_mesh.png"
-CIRCLES_IN_RECTANGLE_PATH = r"./outputs/circle_in_rectangle_with_mesh.png"
+COVER_EDGES_PATH   = f"{OUTPUT_PATH}/cover_edges_with_mesh.png"
+CIRCLES_EDGES_PATH = f"{OUTPUT_PATH}/circle_edges_with_mesh.png"
+HOLE_EDGES_PATH    = f"{OUTPUT_PATH}/hole_edges_with_mesh.png"
+RECTANGLE_EDGES_PATH = f"{OUTPUT_PATH}/rectangle_edges_with_mesh.png"
+CIRCLES_IN_RECTANGLE_PATH = f"{OUTPUT_PATH}/circle_in_rectangle_with_mesh.png"
 radiator_corner = (174, 143)
 
 
@@ -180,23 +180,18 @@ if __name__ == "__main__":
     # Detect cover edges
     cover_result = detect_cover(img)
     display(cover_result.image, "Detects the cover")
-    # cv2.imwrite(COVER_EDGES_PATH, cover_result.image)
 
     # Detect hole edges
     hole_result = detect_holes_in_cover(img, cover_result)
     display(hole_result.image, "Detects the holes")
-    # cv2.imwrite(HOLE_EDGES_PATH, hole_result.image)
 
     # Detect cercle edges
     cercle_result = detect_cercles(img)
     display(cercle_result.image, "Detects the cercles")
-    # cv2.imwrite(CIRCLES_EDGES_PATH, cercle_result.image)
 
     # Detect and draw the rectangle around the radiator
     rectangle_result = detect_rectangle(img)
     display(rectangle_result.image, "Detects the rectangle")
-    #cv2.imwrite(RECTANGLE_EDGES_PATH, rectangle_result.image)
 
     cercles_in_rectangle_result = detect_cercles_in_cover_area(img)
     display(cercles_in_rectangle_result.image, "Detects the holes in the cover")
-    # cv2.imwrite(CIRCLES_IN_RECTANGLE_PATH, cercles_in_rectangle_result.image)
