@@ -18,8 +18,8 @@ from render import (
     SIDE_LIGHT_POSE,
 )
 
-TOP_SIMULATION_PATH = Path(OUTPUT_PATH / "robotic_top_simulation.mp4")
-SIDE_SIMULATION_PATH = Path(OUTPUT_PATH / "robotic_side_simulation.mp4")
+TOP_SIMULATION_PATH = f"{OUTPUT_PATH}/robotic_top_simulation.mp4"
+SIDE_SIMULATION_PATH = f"{OUTPUT_PATH}/robotic_side_simulation.mp4"
 
 
 
@@ -74,5 +74,5 @@ if __name__ == "__main__":
         num_steps=100,
         camera_pose=SIDE_CAMERA_POSE,
         light_pose=SIDE_LIGHT_POSE,
-        output_video=str(SIDE_SIMULATION_PATH),
+        output_video=SIDE_SIMULATION_PATH,
     )
