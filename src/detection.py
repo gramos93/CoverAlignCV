@@ -13,7 +13,7 @@ from render import (
     RADIATEUR_WITHOUT_MESH_PATH,
 )
 
-radiator_corner = (174, 143)
+top_left_corner_of_radiator = (174, 143)
 
 
 
@@ -170,6 +170,10 @@ def define_and_mask_area(image, x=73, y=142, w=467, h=224) -> tuple[
 
 
 if __name__ == "__main__":
+    pose = "top"
+    RADIATEUR_WITH_MESH_PATH = f"{OUTPUT_PATH}/{pose}_{RADIATEUR_WITH_MESH_PATH}"
+    RADIATEUR_WITHOUT_MESH_PATH = f"{OUTPUT_PATH}/{pose}_{RADIATEUR_WITHOUT_MESH_PATH}"
+
     # Preprocessing
     img = image_preprocessing(RADIATEUR_WITH_MESH_PATH)
 

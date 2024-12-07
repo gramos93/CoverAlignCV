@@ -3,6 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from dataclasses import dataclass
 from render import (
+    OUTPUT_PATH,
     RADIATEUR_WITH_MESH_PATH,
     RADIATEUR_WITHOUT_MESH_PATH
 )
@@ -48,6 +49,10 @@ def display(image, title="Detected Holes"):
 
 
 if __name__ == '__main__':
+    pose = "top"
+    RADIATEUR_WITH_MESH_PATH = f"{OUTPUT_PATH}/{pose}_{RADIATEUR_WITH_MESH_PATH}"
+    RADIATEUR_WITHOUT_MESH_PATH = f"{OUTPUT_PATH}/{pose}_{RADIATEUR_WITHOUT_MESH_PATH}"
+
     # Charger l'image
     image_with_mesh = cv2.imread(RADIATEUR_WITH_MESH_PATH, cv2.IMREAD_GRAYSCALE)
     image_without_mesh = cv2.imread(RADIATEUR_WITHOUT_MESH_PATH, cv2.IMREAD_GRAYSCALE)

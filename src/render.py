@@ -1,3 +1,4 @@
+import os
 from typing import Tuple, Optional
 import numpy as np
 import pyrender
@@ -9,9 +10,11 @@ from dataclasses import dataclass
 COUVERCLE_PATH = "../assets/3dmodels/couvercle.stl"
 BOITIER_PATH = "../assets/3dmodels/boitier.stl"
 
-OUTPUT_PATH = r"./outputs"
-RADIATEUR_WITH_MESH_PATH = f"{OUTPUT_PATH}/with_mesh.png"
-RADIATEUR_WITHOUT_MESH_PATH = f"{OUTPUT_PATH}/without_mesh.png"
+OUTPUT_PATH = r"./output"
+if not os.path.exists(OUTPUT_PATH):
+    os.makedirs(OUTPUT_PATH)
+RADIATEUR_WITH_MESH_PATH = f"with_mesh.png"
+RADIATEUR_WITHOUT_MESH_PATH = f"without_mesh.png"
 
 ORIGIN_OFFSET = np.array([651.86, 573.76, -2_894.40])
 TOP_CAMERA_POSE = np.array([
@@ -233,8 +236,8 @@ def render_for_pose(pose="top") -> None:
             handler.set_camera_pose(TOP_CAMERA_POSE)
             handler.set_light_pose(TOP_LIGHT_POSE)
 
-        with_mesh_path = OUTPUT_PATH / f"{pose}_{RADIATEUR_WITH_MESH_PATH.name}"
-        without_mesh_path = OUTPUT_PATH / f"{pose}_{RADIATEUR_WITHOUT_MESH_PATH.name}"
+        with_mesh_path = f"{OUTPUT_PATH}/{pose}_{RADIATEUR_WITH_MESH_PATH}"
+        without_mesh_path = f"{OUTPUT_PATH}/{pose}_{RADIATEUR_WITHOUT_MESH_PATH}"
 
         with_cov = handler.render(show_cov=True)
         without_cov = handler.render(show_cov=False)
