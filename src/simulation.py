@@ -70,9 +70,18 @@ def simulate_robotic_movement(
 
 if __name__ == "__main__":
     # Simulate robotic movements on the mesh, estimate hole positions and record video
+    print("\nSIDE SIMULATION:")
     simulate_robotic_movement(
         num_steps=100,
         camera_pose=SIDE_CAMERA_POSE,
         light_pose=SIDE_LIGHT_POSE,
         output_video=SIDE_SIMULATION_PATH,
+    )
+
+    print("\nTOP SIMULATION:")
+    simulate_robotic_movement(
+        num_steps=100,
+        camera_pose=TOP_CAMERA_POSE,
+        light_pose=TOP_LIGHT_POSE,
+        output_video=TOP_SIMULATION_PATH,
     )

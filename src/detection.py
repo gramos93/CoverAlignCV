@@ -13,11 +13,6 @@ from render import (
     RADIATEUR_WITHOUT_MESH_PATH,
 )
 
-COVER_EDGES_PATH   = f"{OUTPUT_PATH}/cover_edges_with_mesh.png"
-CIRCLES_EDGES_PATH = f"{OUTPUT_PATH}/circle_edges_with_mesh.png"
-HOLE_EDGES_PATH    = f"{OUTPUT_PATH}/hole_edges_with_mesh.png"
-RECTANGLE_EDGES_PATH = f"{OUTPUT_PATH}/rectangle_edges_with_mesh.png"
-CIRCLES_IN_RECTANGLE_PATH = f"{OUTPUT_PATH}/circle_in_rectangle_with_mesh.png"
 radiator_corner = (174, 143)
 
 
@@ -139,7 +134,7 @@ def detect_cercles_in_cover_area(processed_image: OpenCVImage) -> FindTheCercles
     new_image = np.copy(processed_image.cv_image)
 
     # Define the cover area
-    cover_area, cover_mask = define_and_mask_area(processed_image.gray, w=170)
+    cover_area, cover_mask = define_and_mask_area(processed_image.gray, w=170+150)
     x, y, w, h = cover_area
     cv2.rectangle(new_image, (x, y), (x+w, y+h), (0, 255, 0), 2)
     masked_image = cv2.bitwise_and(processed_image.gray, processed_image.gray, mask=cover_mask)
@@ -148,6 +143,7 @@ def detect_cercles_in_cover_area(processed_image: OpenCVImage) -> FindTheCercles
     circles = cv2.HoughCircles(masked_image, cv2.HOUGH_GRADIENT, dp=1.2, minDist=20, param1=50, param2=20, minRadius=5, maxRadius=10)
     centers = []
     if circles is not None:
+        print("Cercle détecté.")
         circles = np.round(circles[0, :]).astype("int")
         for (x, y, r)  in circles:
             centers.append((x, y, r))
@@ -163,7 +159,7 @@ def detect_cercles_in_cover_area(processed_image: OpenCVImage) -> FindTheCercles
     )
 
 
-def define_and_mask_area(image, x=173, y=142, w=467, h=224) -> tuple[
+def define_and_mask_area(image, x=73, y=142, w=467, h=224) -> tuple[
     tuple[int, int, int, int], tuple[int, int, int, int]]:
     """Define an area of the image and its mask."""
     area = (x, y, w, h)
