@@ -1,14 +1,19 @@
 from typing import Tuple, Optional
+from pathlib import Path
 import numpy as np
 import pyrender
 import trimesh
+from PIL import Image
 from dataclasses import dataclass
 
 
 COUVERCLE_PATH = "../assets/3dmodels/couvercle.stl"
 BOITIER_PATH = "../assets/3dmodels/boitier.stl"
-RADIATEUR_WITH_MESH_PATH = r"./outputs/with_mesh.png"
-RADIATEUR_WITHOUT_MESH_PATH = r"./outputs/without_mesh.png"
+
+OUTPUT_PATH = Path("./outputs")
+RADIATEUR_WITH_MESH_PATH = Path("with_mesh.png")
+RADIATEUR_WITHOUT_MESH_PATH = Path("without_mesh.png")
+
 ORIGIN_OFFSET = np.array([651.86, 573.76, -2_894.40])
 TOP_CAMERA_POSE = np.array([
     [0.0, 1.0, 0.0, 0.0],
@@ -34,6 +39,7 @@ SIDE_LIGHT_POSE = np.array([
     [1.0, 0.0, 0.0, 0.0],
     [0.0, 0.0, 0.0, 1.0],
 ])
+
 
 def quaternion_multiply(q1, q2):
     """
@@ -209,24 +215,36 @@ class SceneHandler:
         """Clean up resources"""
         self.renderer.delete()
 
+
+def render_for_pose(pose="top") -> None:
+        config = SceneConfig(
+            viewport_width=640,
+            viewport_height=480,
+            light_intensity=4.0
+        )
+        handler = SceneHandler.from_stl_files(
+            mesh_path=COUVERCLE_PATH,
+            rad_mesh_path=BOITIER_PATH,
+            config=config
+        )
+        if pose == "side":
+            handler.set_camera_pose(SIDE_CAMERA_POSE)
+            handler.set_light_pose(SIDE_LIGHT_POSE)
+        else:
+            handler.set_camera_pose(TOP_CAMERA_POSE)
+            handler.set_light_pose(TOP_LIGHT_POSE)
+
+        with_mesh_path = OUTPUT_PATH / f"{pose}_{RADIATEUR_WITH_MESH_PATH.name}"
+        without_mesh_path = OUTPUT_PATH / f"{pose}_{RADIATEUR_WITHOUT_MESH_PATH.name}"
+
+        with_cov = handler.render(show_cov=True)
+        without_cov = handler.render(show_cov=False)
+        handler.cleanup()
+
+        Image.fromarray(with_cov).save(with_mesh_path)
+        Image.fromarray(without_cov).save(without_mesh_path)
+
+
 if __name__ == "__main__":
-    from PIL import Image
-
-    config = SceneConfig(
-        viewport_width=640,
-        viewport_height=480,
-        light_intensity=4.0
-    )
-    handler = SceneHandler.from_stl_files(
-        mesh_path=COUVERCLE_PATH,
-        rad_mesh_path=BOITIER_PATH,
-        config=config
-    )
-    handler.set_camera_pose(TOP_CAMERA_POSE)
-    handler.set_light_pose(TOP_LIGHT_POSE)
-    with_cov = handler.render(show_cov=True)
-    without_cov = handler.render(show_cov=False)
-
-    handler.cleanup()
-    Image.fromarray(with_cov).save(RADIATEUR_WITH_MESH_PATH)
-    Image.fromarray(without_cov).save(RADIATEUR_WITHOUT_MESH_PATH)
+    render_for_pose("top")
+    render_for_pose("side")
