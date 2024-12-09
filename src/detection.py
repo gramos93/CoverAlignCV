@@ -1,7 +1,7 @@
 import numpy as np
 import cv2
 from dataclasses import dataclass
-from typing import Sequence
+from typing import Tuple, Optional, Sequence
 from preprocessing import (
     display,
     image_preprocessing,
@@ -13,9 +13,119 @@ from render import (
     RADIATEUR_WITHOUT_MESH_PATH,
 )
 
+@dataclass
+class DetectionConfig:
+    vertical_line_zone: Tuple[int, int, int, int] = (130, 500, 90, 700)
+    horizontal_line_zone: Tuple[int, int, int, int] = (190, 1100, 800, 100)
+    hole_zone: Tuple[int, int, int, int] = (500, 550, 125, 125)
+
+class RadiatorHandler:
+    def __init__(self, image_path: str, config: DetectionConfig = DetectionConfig()):
+        self.config = config
+        self.image = cv2.imread(image_path)
+        if self.image is None:
+            raise ValueError(f"Failed to load image at: {image_path}")
+        self.processed_image = self.image.copy()
+        self._intersection: Optional[Tuple[int, int]] = None
+        self._hole_center: Optional[Tuple[int, int]] = None
+
+    def _detect_line(self, zone: Tuple[int, int, int, int], vertical: bool = True) -> Optional[Tuple[int, int, int, int]]:
+        """Detect either vertical or horizontal line in the specified zone"""
+        x, y, w, h = zone
+        sub_image = self.image[y:y + h, x:x + w]
+        gray = cv2.cvtColor(sub_image, cv2.COLOR_BGR2GRAY)
+        blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+        edges = cv2.Canny(blurred, 50, 150)
+
+        lines = cv2.HoughLinesP(edges, 1, np.pi/180, threshold=50, minLineLength=50, maxLineGap=10)
+
+        if lines is not None:
+            for line in lines:
+                x1, y1, x2, y2 = line[0]
+                if vertical and abs(x1 - x2) < 10:  # Vertical line
+                    return (x1 + x, y1 + y, x2 + x, y2 + y)
+                elif not vertical and abs(y1 - y2) < 10:  # Horizontal line
+                    return (x1 + x, y1 + y, x2 + x, y2 + y)
+        return None
+
+    def _detect_hole(self, zone: Tuple[int, int, int, int]) -> Optional[Tuple[int, int]]:
+        """Detect hole in the specified zone"""
+        x, y, w, h = zone
+        sub_image = self.image[y:y + h, x:x + w]
+        gray = cv2.cvtColor(sub_image, cv2.COLOR_BGR2GRAY)
+
+        circles = cv2.HoughCircles(
+            gray,
+            cv2.HOUGH_GRADIENT,
+            dp=1.2,
+            minDist=20,
+            param1=50,
+            param2=20,
+            minRadius=1,
+            maxRadius=12
+        )
+
+        if circles is not None:
+            circles = np.around(circles)
+            x_c, y_c, r = circles[0][0]
+            center = (x_c + x, y_c + y)
+            cv2.circle(self.processed_image, center, r, (0, 255, 255), 2)
+            return center
+        return None
+
+    def process_image(self) -> None:
+        """Process the image to detect lines and hole"""
+        vertical_line = self._detect_line(self.config.vertical_line_zone, vertical=True)
+        horizontal_line = self._detect_line(self.config.horizontal_line_zone, vertical=False)
+        self._hole_center = self._detect_hole(self.config.hole_zone)
+
+        if all([vertical_line, horizontal_line, self._hole_center]):
+            x1_v, y1_v, x2_v, y2_v = vertical_line
+            x1_h, y1_h, x2_h, y2_h = horizontal_line
+            self._intersection = (x1_v, y1_h)
+
+            # Draw results
+            cv2.line(self.processed_image, (x1_v, y1_v), (x2_v, y2_v), (255, 0, 255), 3)
+            cv2.line(self.processed_image, (x1_h, y1_h), (x2_h, y2_h), (255, 0, 255), 3)
+            cv2.circle(self.processed_image, self._intersection, 5, (255, 0, 0), -1)
+
+    def get_intersection(self) -> Optional[Tuple[int, int]]:
+        """Return the intersection point of vertical and horizontal lines"""
+        return self._intersection
+
+    def get_hole_center(self) -> Optional[Tuple[int, int]]:
+        """Return the center coordinates of the detected hole"""
+        return self._hole_center
+
+    def get_relative_coordinates(self) -> Optional[Tuple[int, int]]:
+        """Return the relative coordinates of the hole center to the intersection"""
+        if self._intersection and self._hole_center:
+            return (
+                self._hole_center[0] - self._intersection[0],
+                self._hole_center[1] - self._intersection[1]
+            )
+        return None
+
+    def display_result(self) -> None:
+        """Display the processed image with detections"""
+        RESIZE_MAX_HEIGHT = 800
+        RESIZE_MAX_WIDTH = 1200
+
+        height, width = self.processed_image.shape[:2]
+        if height > RESIZE_MAX_HEIGHT or width > RESIZE_MAX_WIDTH:
+            scale = min(
+                RESIZE_MAX_HEIGHT / height,
+                RESIZE_MAX_WIDTH / width
+            )
+            dim = (int(width * scale), int(height * scale))
+            resized = cv2.resize(self.processed_image, dim)
+            cv2.imshow("Detection Result", resized)
+        else:
+            cv2.imshow("Detection Result", self.processed_image)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+
 top_left_corner_of_radiator = (174, 143)
-
-
 
 @dataclass
 class FindTheEdges:

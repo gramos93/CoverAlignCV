@@ -1,10 +1,8 @@
-from pathlib import Path
 import time
 import cv2
 
 from detection import (
     OpenCVImage,
-    detect_cercles,
     detect_cercles_in_cover_area,
 )
 from render import (
@@ -20,7 +18,6 @@ from render import (
 
 TOP_SIMULATION_PATH = f"{OUTPUT_PATH}/robotic_top_simulation.mp4"
 SIDE_SIMULATION_PATH = f"{OUTPUT_PATH}/robotic_side_simulation.mp4"
-
 
 
 def simulate_robotic_movement(
@@ -71,16 +68,16 @@ def simulate_robotic_movement(
 if __name__ == "__main__":
     # Simulate robotic movements on the mesh, estimate hole positions and record video
     print("\nSIDE SIMULATION:")
-    simulate_robotic_movement(
-        num_steps=100,
-        camera_pose=SIDE_CAMERA_POSE,
-        light_pose=SIDE_LIGHT_POSE,
-        output_video=SIDE_SIMULATION_PATH,
-    )
+    # simulate_robotic_movement(
+    #     num_steps=12,
+    #     camera_pose=SIDE_CAMERA_POSE,
+    #     light_pose=SIDE_LIGHT_POSE,
+    #     output_video=SIDE_SIMULATION_PATH,
+    # )
 
     print("\nTOP SIMULATION:")
     simulate_robotic_movement(
-        num_steps=100,
+        num_steps=12,
         camera_pose=TOP_CAMERA_POSE,
         light_pose=TOP_LIGHT_POSE,
         output_video=TOP_SIMULATION_PATH,

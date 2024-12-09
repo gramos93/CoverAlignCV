@@ -13,8 +13,8 @@ BOITIER_PATH = "../assets/3dmodels/boitier.stl"
 OUTPUT_PATH = r"./output"
 if not os.path.exists(OUTPUT_PATH):
     os.makedirs(OUTPUT_PATH)
-RADIATEUR_WITH_MESH_PATH = f"with_mesh.png"
-RADIATEUR_WITHOUT_MESH_PATH = f"without_mesh.png"
+RADIATEUR_WITH_MESH_PATH = "with_mesh.png"
+RADIATEUR_WITHOUT_MESH_PATH = "without_mesh.png"
 
 ORIGIN_OFFSET = np.array([651.86, 573.76, -2_894.40])
 TOP_CAMERA_POSE = np.array([
