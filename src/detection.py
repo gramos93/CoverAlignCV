@@ -20,19 +20,17 @@ class DetectionConfig:
     hole_zone: Tuple[int, int, int, int] = (500, 550, 125, 125)
 
 class RadiatorHandler:
-    def __init__(self, image_path: str, config: DetectionConfig = DetectionConfig()):
+    def __init__(self, image: OpenCVImage, config: DetectionConfig = DetectionConfig()):
         self.config = config
-        self.image = cv2.imread(image_path)
-        if self.image is None:
-            raise ValueError(f"Failed to load image at: {image_path}")
-        self.processed_image = self.image.copy()
+        self.image = image
+        self.processed_image = self.image.cv_image.copy()
         self._intersection: Optional[Tuple[int, int]] = None
         self._hole_center: Optional[Tuple[int, int]] = None
 
     def _detect_line(self, zone: Tuple[int, int, int, int], vertical: bool = True) -> Optional[Tuple[int, int, int, int]]:
         """Detect either vertical or horizontal line in the specified zone"""
         x, y, w, h = zone
-        sub_image = self.image[y:y + h, x:x + w]
+        sub_image = self.image.cv_image[y:y + h, x:x + w]
         gray = cv2.cvtColor(sub_image, cv2.COLOR_BGR2GRAY)
         blurred = cv2.GaussianBlur(gray, (5, 5), 0)
         edges = cv2.Canny(blurred, 50, 150)
@@ -51,7 +49,7 @@ class RadiatorHandler:
     def _detect_hole(self, zone: Tuple[int, int, int, int]) -> Optional[Tuple[int, int]]:
         """Detect hole in the specified zone"""
         x, y, w, h = zone
-        sub_image = self.image[y:y + h, x:x + w]
+        sub_image = self.image.cv_image[y:y + h, x:x + w]
         gray = cv2.cvtColor(sub_image, cv2.COLOR_BGR2GRAY)
 
         circles = cv2.HoughCircles(
