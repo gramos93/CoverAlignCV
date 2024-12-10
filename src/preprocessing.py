@@ -16,6 +16,12 @@ class OpenCVImage:
     cv_image: np.ndarray
     gray: np.ndarray
 
+def create_open_cv_image(image: np.ndarray) -> OpenCVImage:
+    return OpenCVImage(
+        np_image=image,
+        cv_image=cv2.cvtColor(image, cv2.COLOR_RGB2BGR),
+        gray=cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
+    )
 
 def image_preprocessing(image_path: str) -> OpenCVImage:
     """Convert an array image from RGB to BGR format and then to grayscale"""
@@ -59,4 +65,3 @@ if __name__ == '__main__':
 
     plot_histogram(image_with_mesh)
     plot_histogram(image_without_mesh)
-
