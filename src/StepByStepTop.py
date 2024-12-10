@@ -1,13 +1,13 @@
 import cv2
 import numpy as np
 
-from DetectTop import VUE_DESSUS_PATH
+VUE_DESSUS_PATH = "/home/gramos/Projects/CoverAlignCV/TopRad.png"
 
 # Définir la troisième zone de recherche (x, y, largeur, hauteur)
 zones_pour_image_de_dessus = [
-    (130, 500, 90, 700),
-    (190, 1100, 800, 100),
-    (500, 550, 125, 125)
+    (170, 130, 30, 250),
+    (170, 130, 175, 45),
+    (312, 231, 35, 35)
  ]  # Ajout de la troisième zone
 
 
