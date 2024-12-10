@@ -16,9 +16,9 @@ from render import (
 
 @dataclass
 class RadDetConfig:
-    vertical_line_zone: Tuple[int, int, int, int] = (130, 500, 90, 700)
-    horizontal_line_zone: Tuple[int, int, int, int] = (190, 1100, 800, 100)
-    hole_zone: Tuple[int, int, int, int] = (500, 550, 125, 125)
+    vertical_line_zone: Tuple[int, int, int, int] = (170, 130, 30, 250)
+    horizontal_line_zone: Tuple[int, int, int, int] = (170, 130, 175, 45)
+    hole_zone: Tuple[int, int, int, int] = (312, 231, 35, 35)
 
 
 class RadiatorHandler:
@@ -27,108 +27,124 @@ class RadiatorHandler:
         self.image = image
         self.processed_image = self.image.cv_image.copy()
         self._intersection: Optional[Tuple[int, int]] = None
-        self._hole_center: Optional[Tuple[int, int]] = None
+        self._hole: Optional[Tuple[int, int]] = None
 
     def _detect_line(self, zone: Tuple[int, int, int, int], vertical: bool = True) -> Optional[Tuple[int, int, int, int]]:
         """Detect either vertical or horizontal line in the specified zone"""
         x, y, w, h = zone
-        sub_image = self.image.cv_image[y:y + h, x:x + w]
-        gray = cv2.cvtColor(sub_image, cv2.COLOR_BGR2GRAY)
-        blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+        cv2.rectangle(self.processed_image, (x, y), (x+w, y+h), (0, 255, 0), 2)
+        # blurred = cv2.GaussianBlur(self.image.gray[y:y + h, x:x + w], (5, 5), 0)
+        blurred = self.image.gray[y:y + h, x:x + w]
+        self.display_result(blurred)
         edges = cv2.Canny(blurred, 50, 150)
 
-        lines = cv2.HoughLinesP(edges, 1, np.pi/180, threshold=50, minLineLength=50, maxLineGap=10)
+        lines = cv2.HoughLinesP(edges, 1, np.pi/180, threshold=50, minLineLength=50, maxLineGap=10)[:, 0, :].tolist()
+        lines = sorted(
+            lines,
+            key=lambda x: min(x[1], x[3]) if not vertical else min(x[0], x[2]),
+        )
 
         if lines is not None:
             for line in lines:
-                x1, y1, x2, y2 = line[0]
-                if vertical and abs(x1 - x2) < 10:  # Vertical line
+                x1, y1, x2, y2 = line
+                if vertical and abs(x1 - x2) < 5:
                     return (x1 + x, y1 + y, x2 + x, y2 + y)
-                elif not vertical and abs(y1 - y2) < 10:  # Horizontal line
+
+                elif not vertical and abs(y1 - y2) < 5:
                     return (x1 + x, y1 + y, x2 + x, y2 + y)
+
         return None
 
-    def _detect_hole(self, zone: Tuple[int, int, int, int]) -> Optional[Tuple[int, int]]:
+    def _detect_hole(self, zone: Tuple[int, int, int, int]) -> Optional[Tuple[int, int, int]]:
         """Detect hole in the specified zone"""
         x, y, w, h = zone
-        sub_image = self.image.cv_image[y:y + h, x:x + w]
-        blurred = cv2.GaussianBlur(cv2.cvtColor(sub_image, cv2.COLOR_BGR2GRAY), (5, 5), 0)
+        cv2.rectangle(self.processed_image, (x, y), (x+w, y+h), (0, 255, 0), 2)
 
+        # NOTE: In the simulation the blurring is not helping.
+        # blurred = cv2.GaussianBlur(self.image.gray[y:y + h, x:x + w], (5, 5), 0)
         circles = cv2.HoughCircles(
-            blurred,
+            self.image.gray[y:y + h, x:x + w],
             cv2.HOUGH_GRADIENT,
-            dp=1.2,
+            dp=h/8,
             minDist=20,
-            param1=50,
-            param2=20,
-            minRadius=1,
-            maxRadius=12
+            param1=100,
+            param2=30,
+            minRadius=0,
+            maxRadius=0
         )
 
         if circles is not None:
-            circles = np.around(circles)
+            circles = np.uint16(np.around(circles))
             x_c, y_c, r = circles[0][0]
-            center = (x_c + x, y_c + y)
-            cv2.circle(self.processed_image, center, r, (0, 255, 255), 2)
-            return center
+            return (x_c + x, y_c + y, r)
         return None
 
     def process_image(self) -> None:
         """Process the image to detect lines and hole"""
         vertical_line = self._detect_line(self.config.vertical_line_zone, vertical=True)
         horizontal_line = self._detect_line(self.config.horizontal_line_zone, vertical=False)
-        self._hole_center = self._detect_hole(self.config.hole_zone)
+        self._hole = self._detect_hole(self.config.hole_zone)
 
-        if all([vertical_line, horizontal_line, self._hole_center]):
+        if all([vertical_line, horizontal_line, self._hole]):
             x1_v, y1_v, x2_v, y2_v = vertical_line
             x1_h, y1_h, x2_h, y2_h = horizontal_line
-            self._intersection = (x1_v, y1_h)
+            self._intersection = self.calculate_intersection(vertical_line, horizontal_line)
+            cx, cy, r  = self._hole
 
             # Draw results
-            cv2.line(self.processed_image, (x1_v, y1_v), (x2_v, y2_v), (255, 0, 255), 3)
-            cv2.line(self.processed_image, (x1_h, y1_h), (x2_h, y2_h), (255, 0, 255), 3)
-            cv2.circle(self.processed_image, self._intersection, 5, (255, 0, 0), -1)
+            cv2.line(self.processed_image, (x1_v, y1_v), (x2_v, y2_v), (255, 0, 255), 2)
+            cv2.line(self.processed_image, (x1_h, y1_h), (x2_h, y2_h), (255, 0, 255), 2)
+            cv2.circle(self.processed_image, (cx, cy), r, (255, 0, 0), 1)
 
-    def get_intersection(self) -> Optional[Tuple[int, int]]:
+            if self._intersection is not None:
+                cv2.circle(self.processed_image, self._intersection, r, (0, 255, 0), 1)
+
+        else:
+            print("Lines or hole not found")
+
+    def calculate_intersection(self, vertical_line, horizontal_line) -> Optional[Tuple[int, int]]:
         """Return the intersection point of vertical and horizontal lines"""
-        return self._intersection
 
-    def get_hole_center(self) -> Optional[Tuple[int, int]]:
+        x1, y1, x2, y2 = vertical_line
+        x3, y3, x4, y4 = horizontal_line
+
+        denom = ((x1 - x2)*(y3 - y4) - (y1 - y2)*(x3 - x4))
+        if denom == 0:
+            return None
+
+        x = (x1*y2 - y1*x2)*(x3 - x4) - (x1 - x2)*(x3*y4 - y3*x4) / denom
+        y = (x1*y2 - y1*x2)*(y3 - y4) - (y1 - y2)*(x3*y4 - y3*x4) / denom
+
+        return (int(x), int(y))
+
+    def get_hole(self) -> Optional[Tuple[int, int]]:
         """Return the center coordinates of the detected hole"""
-        return self._hole_center
+        return self._hole
 
-    def get_relative_coordinates(self) -> Optional[Tuple[int, int]]:
-        """Return the relative coordinates of the hole center to the intersection"""
-        if self._intersection and self._hole_center:
-            return (
-                self._hole_center[0] - self._intersection[0],
-                self._hole_center[1] - self._intersection[1]
-            )
-        return None
-
-    def display_result(self) -> None:
+    def display_result(self, img: Optional[np.ndarray] = None) -> None:
         """Display the processed image with detections"""
         RESIZE_MAX_HEIGHT = 800
         RESIZE_MAX_WIDTH = 1200
 
-        height, width = self.processed_image.shape[:2]
+        img = img if (img is not None) else self.processed_image
+        height, width = img.shape[:2]
+
         if height > RESIZE_MAX_HEIGHT or width > RESIZE_MAX_WIDTH:
             scale = min(
                 RESIZE_MAX_HEIGHT / height,
                 RESIZE_MAX_WIDTH / width
             )
             dim = (int(width * scale), int(height * scale))
-            resized = cv2.resize(self.processed_image, dim)
+            resized = cv2.resize(img, dim)
             cv2.imshow("Detection Result", resized)
         else:
-            cv2.imshow("Detection Result", self.processed_image)
+            cv2.imshow("Detection Result", img)
         cv2.waitKey(0)
         cv2.destroyAllWindows()
 
 @dataclass
 class CoverDetConfig:
-    # Define the zone where we expect to find the cover holes
-    holes_zone: Tuple[int, int, int, int] = (200, 200, 600, 200)  # (x, y, width, height)
+    holes_zone: Tuple[int, int, int, int] = (312, 231, 34, 32)  # (x, y, width, height)
     min_hole_distance: int = 100  # Minimum distance between holes
     max_hole_distance: int = 400  # Maximum distance between holes
 
@@ -153,9 +169,9 @@ class CoverHandler:
             or None if no suitable line detected
         """
         x, y, w, h = zone
-        sub_image = self.image.cv_image[y:y + h, x:x + w]
-        gray = cv2.cvtColor(sub_image, cv2.COLOR_BGR2GRAY)
-        blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+        cv2.rectangle(self.processed_image, (x, y), (x+w, y+h), (0, 255, 0), 2)
+
+        blurred = cv2.GaussianBlur(self.image.gray[y:y + h, x:x + w], (5, 5), 0)
         edges = cv2.Canny(blurred, 50, 150)
 
         lines = cv2.HoughLinesP(edges, 1, np.pi/180, threshold=50, minLineLength=50, maxLineGap=10)
@@ -203,18 +219,19 @@ class CoverHandler:
     def _detect_holes(self, zone: Tuple[int, int, int, int]) -> List[Tuple[int, int]]:
         """Detect holes in the specified zone"""
         x, y, w, h = zone
-        sub_image = self.image.cv_image[y:y + h, x:x + w]
-        blurred = cv2.GaussianBlur(cv2.cvtColor(sub_image, cv2.COLOR_BGR2GRAY), (5, 5), 0)
+        cv2.rectangle(self.processed_image, (x, y), (x+w, y+h), (0, 255, 0), 2)
 
+        # NOTE: See RadiatorHandler for the blurring note.
+        # blurred = cv2.GaussianBlur(self.image.gray[y:y + h, x:x + w], (5, 5), 0)
         circles = cv2.HoughCircles(
-            blurred,
+            self.image.gray[y:y + h, x:x + w],
             cv2.HOUGH_GRADIENT,
-            dp=1.2,
+            dp=h/8,
             minDist=self.config.min_hole_distance,
-            param1=50,
+            param1=100,
             param2=30,
-            minRadius=5,
-            maxRadius=20
+            minRadius=0,
+            maxRadius=0
         )
 
         holes = []
@@ -246,7 +263,7 @@ class CoverHandler:
 
             # Check if distance is within acceptable range
             if self.config.min_hole_distance <= distance <= self.config.max_hole_distance:
-                self._y_angle = self._calculate_angle((*self._left_hole, self._right_hole))
+                self._y_angle = self._calculate_angle((*self._left_hole, *self._right_hole))
 
                 # Draw the line connecting holes
                 cv2.line(
@@ -256,6 +273,10 @@ class CoverHandler:
                     color=(255, 0, 255),
                     thickness=2
                 )
+            else:
+                print("Holes distance out of range")
+        else:
+            print("Not enough holes detected")
 
     def get_left_hole(self) -> Optional[Tuple[int, int]]:
         """Return the coordinates of the left hole"""
@@ -409,11 +430,11 @@ def detect_cercles_in_cover_area(processed_image: OpenCVImage) -> FindTheCercles
     # Define the cover area
     cover_area, cover_mask = define_and_mask_area(processed_image.gray, w=170+150)
     x, y, w, h = cover_area
-    cv2.rectangle(new_image, (x, y), (x+w, y+h), (0, 255, 0), 2)
+    # cv2.rectangle(new_image, (x, y), (x+w, y+h), (0, 255, 0), 2)
     masked_image = cv2.bitwise_and(processed_image.gray, processed_image.gray, mask=cover_mask)
 
     # Detect and draw the holes from the cover area
-    circles = cv2.HoughCircles(masked_image, cv2.HOUGH_GRADIENT, dp=1.2, minDist=20, param1=50, param2=20, minRadius=5, maxRadius=10)
+    circles = cv2.HoughCircles(masked_image, cv2.HOUGH_GRADIENT, dp=1.2, minDist=20, param1=50, param2=20, minRadius=2, maxRadius=10)
     centers = []
     if circles is not None:
         print("Cercle détecté.")
@@ -440,30 +461,36 @@ def define_and_mask_area(image, x=73, y=142, w=467, h=224):
     return area, mask
 
 
-
 if __name__ == "__main__":
-    pose = "top"
-    RADIATEUR_WITH_MESH_PATH = f"{OUTPUT_PATH}/{pose}_{RADIATEUR_WITH_MESH_PATH}"
-    RADIATEUR_WITHOUT_MESH_PATH = f"{OUTPUT_PATH}/{pose}_{RADIATEUR_WITHOUT_MESH_PATH}"
 
-    # Preprocessing
-    img = image_preprocessing(RADIATEUR_WITH_MESH_PATH)
+    from preprocessing import create_open_cv_image
+    from render import (
+        SceneHandler,
+        COUVERCLE_PATH,
+        BOITIER_PATH,
+        TOP_CAMERA_POSE,
+        SIDE_CAMERA_POSE,
+        TOP_LIGHT_POSE,
+        SIDE_LIGHT_POSE,
+    )
+    top = True
 
-    # Detect cover edges
-    cover_result = detect_cover(img)
-    display(cover_result.image, "Detects the cover")
+    scene = SceneHandler.from_stl_files(COUVERCLE_PATH, BOITIER_PATH)
+    scene.set_camera_pose(TOP_CAMERA_POSE if top else SIDE_CAMERA_POSE)
+    scene.set_light_pose(TOP_LIGHT_POSE if top else SIDE_LIGHT_POSE)
 
-    # Detect hole edges
-    hole_result = detect_holes_in_cover(img, cover_result)
-    display(hole_result.image, "Detects the holes")
+    rad_img = scene.render(show_cov=False)
+    rad_img = create_open_cv_image(rad_img)
+    rad_handler = RadiatorHandler(rad_img)
+    # line = rad_handler._detect_line(rad_handler.config.horizontal_line_zone, vertical=False)
+    # print(line)
 
-    # Detect cercle edges
-    cercle_result = detect_cercles(img)
-    display(cercle_result.image, "Detects the cercles")
+    rad_handler.process_image()
+    rad_handler.display_result()
 
-    # Detect and draw the rectangle around the radiator
-    rectangle_result = detect_rectangle(img)
-    display(rectangle_result.image, "Detects the rectangle")
+    # cover_img = scene.render(show_cov=True)
+    # cover_img = create_open_cv_image(cover_img)
 
-    cercles_in_rectangle_result = detect_cercles_in_cover_area(img)
-    display(cercles_in_rectangle_result.image, "Detects the holes in the cover")
+    # cover_handler = CoverHandler(cover_img)
+    # cover_handler.process_image()
+    # cover_handler.display_result()
