@@ -105,6 +105,7 @@ def random_perturbation(
         new_quat = quaternion_multiply(quaternion, current_quat)
         node.rotation = new_quat
 
+
 @dataclass
 class SceneConfig:
     viewport_width: int = 640
@@ -113,6 +114,7 @@ class SceneConfig:
     light_intensity: float = 4.0
     light_color: Tuple = (1.0, 1.0, 1.0)
     camera_fov: float = np.pi / 3.0
+
 
 class SceneHandler:
     def __init__(self, config: SceneConfig = SceneConfig()):
