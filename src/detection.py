@@ -52,10 +52,10 @@ class RadiatorHandler:
         """Detect hole in the specified zone"""
         x, y, w, h = zone
         sub_image = self.image.cv_image[y:y + h, x:x + w]
-        gray = cv2.cvtColor(sub_image, cv2.COLOR_BGR2GRAY)
+        blurred = cv2.GaussianBlur(cv2.cvtColor(sub_image, cv2.COLOR_BGR2GRAY), (5, 5), 0)
 
         circles = cv2.HoughCircles(
-            gray,
+            blurred,
             cv2.HOUGH_GRADIENT,
             dp=1.2,
             minDist=20,
@@ -139,16 +139,72 @@ class CoverHandler:
         self.processed_image = self.image.cv_image.copy()
         self._left_hole: Optional[Tuple[int, int]] = None
         self._right_hole: Optional[Tuple[int, int]] = None
-        self._angle: Optional[float] = None
+        self._y_angle: Optional[float] = None
+        self._x_angle: Optional[float] = None
+
+    def _detect_line(self, zone: Tuple[int, int, int, int]) -> Optional[Tuple[int, int, int, int]]:
+        """Detect slightly rotated horizontal line in the specified zone
+
+        Args:
+            zone: Tuple of (x, y, width, height) defining search area
+
+        Returns:
+            Optional[Tuple[int, int, int, int]]: Coordinates of shortest near-horizontal line found,
+            or None if no suitable line detected
+        """
+        x, y, w, h = zone
+        sub_image = self.image.cv_image[y:y + h, x:x + w]
+        gray = cv2.cvtColor(sub_image, cv2.COLOR_BGR2GRAY)
+        blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+        edges = cv2.Canny(blurred, 50, 150)
+
+        lines = cv2.HoughLinesP(edges, 1, np.pi/180, threshold=50, minLineLength=50, maxLineGap=10)
+
+        if lines is not None:
+            shortest_line = None
+            min_length = float('inf')
+
+            for line in lines:
+                x1, y1, x2, y2 = line[0]
+
+                # Calculate angle with horizontal axis
+                angle = self._calculate_angle((x1, y1, x2, y2))
+
+                # Check if line is within ±5 degrees of horizontal
+                if abs(angle) <= 5:
+                    # Calculate line length
+                    length = np.sqrt((x2 - x1)**2 + (y2 - y1)**2)
+
+                    # Update shortest line if this is shorter
+                    if length < min_length:
+                        min_length = length
+                        shortest_line = (x1 + x, y1 + y, x2 + x, y2 + y)
+
+            return shortest_line
+        return None
+
+    def _calculate_angle(self, line: Tuple[int, int, int, int]) -> float:
+        """Calculate angle between line and horizontal axis
+
+        Args:
+            line: Tuple of (x1, y1, x2, y2) coordinates representing line endpoints
+
+        Returns:
+            float: Angle in degrees between the line and horizontal axis
+        """
+        if line is None:
+            return None
+
+        x1, y1, x2, y2 = line
+        dx = x2 - x1
+        dy = y2 - y1
+        return np.degrees(np.arctan2(dy, dx))
 
     def _detect_holes(self, zone: Tuple[int, int, int, int]) -> List[Tuple[int, int]]:
         """Detect holes in the specified zone"""
         x, y, w, h = zone
         sub_image = self.image.cv_image[y:y + h, x:x + w]
-        gray = cv2.cvtColor(sub_image, cv2.COLOR_BGR2GRAY)
-
-        # Apply image processing to enhance hole detection
-        blurred = cv2.GaussianBlur(gray, (5, 5), 0)
+        blurred = cv2.GaussianBlur(cv2.cvtColor(sub_image, cv2.COLOR_BGR2GRAY), (5, 5), 0)
 
         circles = cv2.HoughCircles(
             blurred,
@@ -172,12 +228,6 @@ class CoverHandler:
 
         return holes
 
-    def _calculate_angle(self, p1: Tuple[int, int], p2: Tuple[int, int]) -> float:
-        """Calculate angle between line and horizontal axis"""
-        dx = p2[0] - p1[0]
-        dy = p2[1] - p1[1]
-        return np.degrees(np.arctan2(dy, dx))
-
     def process_image(self) -> None:
         """Process the image to detect holes and calculate angle"""
         holes = self._detect_holes(self.config.holes_zone)
@@ -196,7 +246,7 @@ class CoverHandler:
 
             # Check if distance is within acceptable range
             if self.config.min_hole_distance <= distance <= self.config.max_hole_distance:
-                self._angle = self._calculate_angle(self._left_hole, self._right_hole)
+                self._y_angle = self._calculate_angle((*self._left_hole, self._right_hole))
 
                 # Draw the line connecting holes
                 cv2.line(
@@ -217,7 +267,7 @@ class CoverHandler:
 
     def get_angle(self) -> Optional[float]:
         """Return the angle between holes line and horizontal axis"""
-        return self._angle
+        return self._y_angle
 
     def display_result(self) -> None:
         """Display the processed image with detections"""
