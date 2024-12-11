@@ -17,7 +17,8 @@ if not os.path.exists(OUTPUT_PATH):
 RADIATEUR_WITH_MESH_PATH = "with_mesh.png"
 RADIATEUR_WITHOUT_MESH_PATH = "without_mesh.png"
 
-ORIGIN_OFFSET = np.array([651.86, 573.76, -2_894.40])
+RAD_ORIGIN_OFFSET = np.array([651.86, 573.76, -2_894.40])
+COV_ORIGIN_OFFSET = np.array([-643.50, -571.50, 2_894.0])
 TOP_CAMERA_POSE = np.array(
     [
         [0.0, 1.0, 0.0, 0.0],
@@ -199,9 +200,11 @@ class SceneHandler:
         bounds = cov_mesh.bounds
         scale_factor = 1.0 / np.max(bounds[1] - bounds[0])
 
-        for m in [cov_mesh, rad_mesh]:
-            m.apply_translation(ORIGIN_OFFSET)
-            m.apply_scale(scale_factor)
+        cov_mesh.apply_translation(COV_ORIGIN_OFFSET)
+        cov_mesh.apply_scale(scale_factor)
+
+        rad_mesh.apply_translation(RAD_ORIGIN_OFFSET)
+        rad_mesh.apply_scale(scale_factor)
 
     def _create_pyrender_meshes(
         self, cov_mesh: trimesh.Trimesh, rad_mesh: trimesh.Trimesh

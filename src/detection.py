@@ -148,7 +148,7 @@ class CoverImage:
 
 @dataclass
 class CoverDetConfig:
-    holes_zone: Tuple[int, int, int, int] = (170, 215, 200, 50)
+    holes_zone: Tuple[int, int, int, int] = (170, 220, 180, 50)
     edge_zone: Tuple[int, int, int, int] = (130, 245, 220, 25)
     min_hole_distance: int = 100
     max_hole_distance: int = 400
@@ -232,15 +232,15 @@ class CoverHandler:
         cv2.rectangle(self.processed_image.top, (x, y), (x+w, y+h), (0, 255, 0), 2)
 
         # NOTE: See RadiatorHandler for the blurring note.
-        # blurred = cv2.GaussianBlur(self.image.gray[y:y + h, x:x + w], (5, 5), 0)
+        # blurred = cv2.GaussianBlur(self.image_top.gray[y:y + h, x:x + w], (5, 5), 0)
         circles = cv2.HoughCircles(
             self.image_top.gray[y:y + h, x:x + w],
             cv2.HOUGH_GRADIENT,
             dp=1.2,
             minDist=20,
-            param1=50,
-            param2=20,
-            minRadius=2,
+            param1=100,
+            param2=30,
+            minRadius=0,
             maxRadius=10,
         )
 
