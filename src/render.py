@@ -77,14 +77,14 @@ def quaternion_multiply(q1, q2):
 @dataclass
 class PerturbationConfig:
     # Translation ranges per axis (None to disable perturbation on that axis)
-    translation_x_range: Optional[float] = 0.02
-    translation_y_range: Optional[float] = None
-    translation_z_range: Optional[float] = None
+    translation_x_range: Optional[Tuple[float, float]] = (0, 0.02)
+    translation_y_range: Optional[Tuple[float, float]] = None
+    translation_z_range: Optional[Tuple[float, float]] = None
 
     # Rotation ranges per axis in radians (None to disable rotation around that axis)
-    rotation_x_range: Optional[float] = None
-    rotation_y_range: Optional[float] = None
-    rotation_z_range: Optional[float] = np.pi / 56.0
+    rotation_x_range: Optional[Tuple[float, float]] = None
+    rotation_y_range: Optional[Tuple[float, float]] = None
+    rotation_z_range: Optional[Tuple[float, float]] = (0, np.pi/36)
 
 def granular_perturbation(
     node: pyrender.Node,
@@ -98,13 +98,12 @@ def granular_perturbation(
     """
     # Random translation
     translation = np.zeros(3)
-    for i, range_value in enumerate([
-        config.translation_x_range,
-        config.translation_y_range,
-        config.translation_z_range
-    ]):
-        if range_value is not None:
-            translation[i] = np.random.uniform(-range_value, range_value)
+    for i, range_tuple in enumerate([config.translation_x_range,
+                                   config.translation_y_range,
+                                   config.translation_z_range]):
+        if range_tuple is not None:
+            min_range, max_range = range_tuple
+            translation[i] = np.random.uniform(min_range, max_range)
 
     if node.translation is None:
         node.translation = translation
@@ -114,18 +113,17 @@ def granular_perturbation(
     # Random rotation - one rotation per enabled axis
     combined_quaternion = np.array([0.0, 0.0, 0.0, 1.0])  # Identity quaternion
 
-    for i, range_value in enumerate([
-        config.rotation_x_range,
-        config.rotation_y_range,
-        config.rotation_z_range
-    ]):
-        if range_value is not None:
+    for i, range_tuple in enumerate([config.rotation_x_range,
+                                   config.rotation_y_range,
+                                   config.rotation_z_range]):
+        if range_tuple is not None:
+            min_range, max_range = range_tuple
             # Create basis vector for this axis
             axis = np.zeros(3)
             axis[i] = 1.0
 
             # Random angle within range
-            angle = np.random.uniform(-range_value, range_value)
+            angle = np.random.uniform(min_range, max_range)
 
             # Convert to quaternion
             half_angle = angle / 2.0
