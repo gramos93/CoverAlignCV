@@ -35,7 +35,6 @@ class RadiatorHandler:
         cv2.rectangle(self.processed_image, (x, y), (x+w, y+h), (0, 255, 0), 2)
         # blurred = cv2.GaussianBlur(self.image.gray[y:y + h, x:x + w], (5, 5), 0)
         blurred = self.image.gray[y:y + h, x:x + w]
-        self.display_result(blurred)
         edges = cv2.Canny(blurred, 50, 150)
 
         lines = cv2.HoughLinesP(edges, 1, np.pi/180, threshold=50, minLineLength=50, maxLineGap=10)[:, 0, :].tolist()
@@ -143,16 +142,27 @@ class RadiatorHandler:
         cv2.destroyAllWindows()
 
 @dataclass
+class CoverImage:
+    top: np.ndarray
+    side: np.ndarray
+
+@dataclass
 class CoverDetConfig:
-    holes_zone: Tuple[int, int, int, int] = (312, 231, 34, 32)  # (x, y, width, height)
-    min_hole_distance: int = 100  # Minimum distance between holes
-    max_hole_distance: int = 400  # Maximum distance between holes
+    holes_zone: Tuple[int, int, int, int] = (170, 215, 200, 50)
+    edge_zone: Tuple[int, int, int, int] = (130, 245, 220, 25)
+    min_hole_distance: int = 100
+    max_hole_distance: int = 400
 
 class CoverHandler:
-    def __init__(self, image: OpenCVImage, config: CoverDetConfig = CoverDetConfig()):
+    def __init__(self, image_top: OpenCVImage, image_side: OpenCVImage, config: CoverDetConfig = CoverDetConfig()):
         self.config = config
-        self.image = image
-        self.processed_image = self.image.cv_image.copy()
+        self.image_top = image_top
+        self.image_side = image_side
+        self.processed_image: CoverImage = CoverImage(
+            top=self.image_top.cv_image.copy(),
+            side=self.image_side.cv_image.copy(),
+        )
+        self._side_edge : Optional[Tuple[int, int, int, int]] = None
         self._left_hole: Optional[Tuple[int, int]] = None
         self._right_hole: Optional[Tuple[int, int]] = None
         self._y_angle: Optional[float] = None
@@ -169,9 +179,9 @@ class CoverHandler:
             or None if no suitable line detected
         """
         x, y, w, h = zone
-        cv2.rectangle(self.processed_image, (x, y), (x+w, y+h), (0, 255, 0), 2)
+        cv2.rectangle(self.processed_image.side, (x, y), (x+w, y+h), (0, 255, 0), 2)
 
-        blurred = cv2.GaussianBlur(self.image.gray[y:y + h, x:x + w], (5, 5), 0)
+        blurred = cv2.GaussianBlur(self.image_side.gray[y:y + h, x:x + w], (5, 5), 0)
         edges = cv2.Canny(blurred, 50, 150)
 
         lines = cv2.HoughLinesP(edges, 1, np.pi/180, threshold=50, minLineLength=50, maxLineGap=10)
@@ -219,19 +229,19 @@ class CoverHandler:
     def _detect_holes(self, zone: Tuple[int, int, int, int]) -> List[Tuple[int, int]]:
         """Detect holes in the specified zone"""
         x, y, w, h = zone
-        cv2.rectangle(self.processed_image, (x, y), (x+w, y+h), (0, 255, 0), 2)
+        cv2.rectangle(self.processed_image.top, (x, y), (x+w, y+h), (0, 255, 0), 2)
 
         # NOTE: See RadiatorHandler for the blurring note.
         # blurred = cv2.GaussianBlur(self.image.gray[y:y + h, x:x + w], (5, 5), 0)
         circles = cv2.HoughCircles(
-            self.image.gray[y:y + h, x:x + w],
+            self.image_top.gray[y:y + h, x:x + w],
             cv2.HOUGH_GRADIENT,
-            dp=h/8,
-            minDist=self.config.min_hole_distance,
-            param1=100,
-            param2=30,
-            minRadius=0,
-            maxRadius=0
+            dp=1.2,
+            minDist=20,
+            param1=50,
+            param2=20,
+            minRadius=2,
+            maxRadius=10,
         )
 
         holes = []
@@ -241,13 +251,26 @@ class CoverHandler:
                 x_c, y_c, r = circle
                 center = (int(x_c + x), int(y_c + y))
                 holes.append(center)
-                cv2.circle(self.processed_image, center, int(r), (0, 255, 255), 2)
+                cv2.circle(self.processed_image.top, center, int(r), (0, 255, 255), 1)
 
         return holes
 
     def process_image(self) -> None:
         """Process the image to detect holes and calculate angle"""
         holes = self._detect_holes(self.config.holes_zone)
+        self._side_edge = self._detect_line(self.config.edge_zone)
+        if self._side_edge is None:
+            self._x_angle = 0
+            print("[CoverHandler] Side edge was not detected, not correcting for X deviation.")
+        else:
+            cv2.line(
+                img=self.processed_image.side,
+                pt1=(self._side_edge[0], self._side_edge[1]),
+                pt2=(self._side_edge[2], self._side_edge[3]),
+                color=(255, 0, 255),
+                thickness=2
+            )
+            self._x_angle = self._calculate_angle(self._side_edge)
 
         if len(holes) >= 2:
             # Sort holes by x-coordinate to get left and right
@@ -267,16 +290,16 @@ class CoverHandler:
 
                 # Draw the line connecting holes
                 cv2.line(
-                    img=self.processed_image,
+                    img=self.processed_image.top,
                     pt1=self._left_hole,
                     pt2=self._right_hole,
                     color=(255, 0, 255),
                     thickness=2
                 )
             else:
-                print("Holes distance out of range")
+                print("[CoverHandler] Holes distance out of range.")
         else:
-            print("Not enough holes detected")
+            print("[CoverHandler] Not enough holes detected.")
 
     def get_left_hole(self) -> Optional[Tuple[int, int]]:
         """Return the coordinates of the left hole"""
@@ -295,17 +318,20 @@ class CoverHandler:
         RESIZE_MAX_HEIGHT = 800
         RESIZE_MAX_WIDTH = 1200
 
-        height, width = self.processed_image.shape[:2]
+        height, width = self.processed_image.top.shape[:2]
         if height > RESIZE_MAX_HEIGHT or width > RESIZE_MAX_WIDTH:
             scale = min(
                 RESIZE_MAX_HEIGHT / height,
                 RESIZE_MAX_WIDTH / width
             )
             dim = (int(width * scale), int(height * scale))
-            resized = cv2.resize(self.processed_image, dim)
-            cv2.imshow("Cover Detection Result", resized)
+            resized_top = cv2.resize(self.processed_image.top, dim)
+            resized_side = cv2.resize(self.processed_image.side, dim)
+            cv2.imshow("Cover Detection Top Result", resized_top)
+            cv2.imshow("Cover Detection Side Result", resized_side)
         else:
-            cv2.imshow("Cover Detection Result", self.processed_image)
+            cv2.imshow("Cover Detection Top Result", self.processed_image.top)
+            cv2.imshow("Cover Detection Side Result", self.processed_image.side)
         cv2.waitKey(0)
         cv2.destroyAllWindows()
 
@@ -430,7 +456,7 @@ def detect_cercles_in_cover_area(processed_image: OpenCVImage) -> FindTheCercles
     # Define the cover area
     cover_area, cover_mask = define_and_mask_area(processed_image.gray, w=170+150)
     x, y, w, h = cover_area
-    # cv2.rectangle(new_image, (x, y), (x+w, y+h), (0, 255, 0), 2)
+    cv2.rectangle(new_image, (x, y), (x+w, y+h), (0, 255, 0), 2)
     masked_image = cv2.bitwise_and(processed_image.gray, processed_image.gray, mask=cover_mask)
 
     # Detect and draw the holes from the cover area
@@ -473,24 +499,25 @@ if __name__ == "__main__":
         TOP_LIGHT_POSE,
         SIDE_LIGHT_POSE,
     )
-    top = True
-
     scene = SceneHandler.from_stl_files(COUVERCLE_PATH, BOITIER_PATH)
-    scene.set_camera_pose(TOP_CAMERA_POSE if top else SIDE_CAMERA_POSE)
-    scene.set_light_pose(TOP_LIGHT_POSE if top else SIDE_LIGHT_POSE)
+    scene.set_camera_pose(TOP_CAMERA_POSE)
+    scene.set_light_pose(TOP_LIGHT_POSE)
 
-    rad_img = scene.render(show_cov=False)
-    rad_img = create_open_cv_image(rad_img)
-    rad_handler = RadiatorHandler(rad_img)
-    # line = rad_handler._detect_line(rad_handler.config.horizontal_line_zone, vertical=False)
-    # print(line)
+    # rad_img = scene.render(show_cov=False)
+    # rad_img = create_open_cv_image(rad_img)
+    # rad_handler = RadiatorHandler(rad_img)
 
-    rad_handler.process_image()
-    rad_handler.display_result()
+    # rad_handler.process_image()
+    # rad_handler.display_result()
 
-    # cover_img = scene.render(show_cov=True)
-    # cover_img = create_open_cv_image(cover_img)
+    cover_img_top = scene.render(show_cov=True)
+    cover_img_top = create_open_cv_image(cover_img_top)
 
-    # cover_handler = CoverHandler(cover_img)
-    # cover_handler.process_image()
-    # cover_handler.display_result()
+    scene.set_camera_pose(SIDE_CAMERA_POSE)
+    scene.set_light_pose(SIDE_LIGHT_POSE)
+    cover_img_side = scene.render(show_cov=True)
+    cover_img_side = create_open_cv_image(cover_img_side)
+
+    cover_handler = CoverHandler(cover_img_top, cover_img_side)
+    cover_handler.process_image()
+    cover_handler.display_result()
