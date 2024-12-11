@@ -150,16 +150,16 @@ def render_all(scene: SceneHandler) -> Tuple[OpenCVImage, OpenCVImage, OpenCVIma
 def simulate_robotic_movement(
     num_steps=50,
     output_video="simulation_robotic.mp4"
-) -> None:
+) -> float:
     """Simulates robotic movements and records a video of hole position estimation."""
     scene = SceneHandler.from_stl_files(COUVERCLE_PATH, BOITIER_PATH)
     init_pertub = sample_perturbation(PerturbationConfig())
     scene.apply_perturbation(init_pertub)
+    correction_error = -1.0
 
     # Video file setup
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
     video_writer = cv2.VideoWriter(output_video, fourcc, fps=1, frameSize=(1280, 720))
-
     for step in range(num_steps):
 
         # Render all views
@@ -189,9 +189,10 @@ def simulate_robotic_movement(
             roll,
             RotationAxis()
         )
+        correction_error = calculate_perturbation_error(init_pertub, correction)
         print(f"Initial Pertubation: {init_pertub}")
         print(f"Correction Matrix: {correction}")
-        print(f"Relative Error: {calculate_perturbation_error(init_pertub, correction):.4f}")
+        print(f"Relative Error: {correction_error:.4f}")
 
         scene.apply_perturbation(correction)
         rad_img, cover_img_top, cover_img_side = render_all(scene)
@@ -217,10 +218,11 @@ def simulate_robotic_movement(
     video_writer.release()
     cv2.destroyAllWindows()
 
+    return correction_error
 
 if __name__ == "__main__":
     # Simulate robotic movements on the mesh, estimate hole positions and record video
-    simulate_robotic_movement(
+    _ = simulate_robotic_movement(
         num_steps=1,
         output_video=SIDE_SIMULATION_PATH,
     )
