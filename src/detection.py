@@ -18,7 +18,7 @@ class RadiatorHandler:
         self.image = image
         self.processed_image = self.image.cv_image.copy()
         self._intersection: Optional[Tuple[int, int]] = None
-        self._hole: Optional[Tuple[int, int]] = None
+        self._hole: Optional[Tuple[int, int, int]] = None
 
     def _detect_line(self, zone: Tuple[int, int, int, int], vertical: bool = True) -> Optional[Tuple[int, int, int, int]]:
         """Detect either vertical or horizontal line in the specified zone"""
@@ -69,9 +69,9 @@ class RadiatorHandler:
         )
 
         if circles is not None:
-            circles = np.uint16(np.around(circles))
+            circles = np.around(circles).astype(np.uint16)
             x_c, y_c, r = circles[0][0]
-            return (x_c + x, y_c + y, r)
+            return (int(x_c + x), int(y_c + y), int(r))
         return None
 
     def process_image(self) -> None:
@@ -112,7 +112,7 @@ class RadiatorHandler:
 
         return (int(x), int(y))
 
-    def get_hole(self) -> Optional[Tuple[int, int]]:
+    def get_hole(self) -> Optional[Tuple[int, int, int]]:
         """Return the center coordinates of the detected hole"""
         return self._hole
 
@@ -147,8 +147,8 @@ class CoverHandler:
             side=self.image_side.cv_image.copy(),
         )
         self._side_edge : Optional[Tuple[int, int, int, int]] = None
-        self._left_hole: Optional[Tuple[int, int]] = None
-        self._right_hole: Optional[Tuple[int, int]] = None
+        self._left_hole: Optional[Tuple[int, int, int]] = None
+        self._right_hole: Optional[Tuple[int, int, int]] = None
         self._y_angle: Optional[float] = None
         self._x_angle: Optional[float] = None
 
@@ -233,9 +233,9 @@ class CoverHandler:
             circles = np.around(circles)
             for circle in circles[0]:
                 x_c, y_c, r = circle
-                center = (int(x_c + x), int(y_c + y))
-                holes.append(center)
-                cv2.circle(self.processed_image.top, center, int(r), (0, 255, 255), 1)
+                circle = (int(x_c + x), int(y_c + y), int(r))
+                holes.append(circle)
+                cv2.circle(self.processed_image.top, circle[:2], int(r), (0, 255, 255), 1)
 
         return holes
 
@@ -270,13 +270,13 @@ class CoverHandler:
 
             # Check if distance is within acceptable range
             if self.config.min_hole_distance <= distance <= self.config.max_hole_distance:
-                self._y_angle = self._calculate_angle((*self._left_hole, *self._right_hole))
+                self._y_angle = self._calculate_angle((*self._left_hole[:2], *self._right_hole[:2]))
 
                 # Draw the line connecting holes
                 cv2.line(
                     img=self.processed_image.top,
-                    pt1=self._left_hole,
-                    pt2=self._right_hole,
+                    pt1=self._left_hole[:2],
+                    pt2=self._right_hole[:2],
                     color=(255, 0, 255),
                     thickness=2
                 )
@@ -293,9 +293,13 @@ class CoverHandler:
         """Return the coordinates of the right hole"""
         return self._right_hole
 
-    def get_angle(self) -> Optional[float]:
+    def get_yaw(self) -> Optional[float]:
         """Return the angle between holes line and horizontal axis"""
         return self._y_angle
+
+    def get_roll(self) -> Optional[float]:
+        """Return the angle between holes line and horizontal axis"""
+        return self._x_angle
 
     def display_result(self) -> None:
         """Display the processed image with detections"""
