@@ -37,10 +37,12 @@ def simulate_robotic_movement(
 
     # Simulation of robotic movements
     for step in range(num_steps):
-        # Apply random perturbation to simulate robotic imprecision
-        # scene.apply_random_perturbation()
+        if step == 10:
+            # Apply random perturbation to simulate robotic imprecision
+            scene.apply_perturbation()
+
         # This line allow the addition of the cover at some point in the loop.
-        color = scene.render(show_cov=True if step > 10 else False)
+        color = scene.render(show_cov=True if step >= 10 else False)
 
         # Write the scene image into a video
         color_bgr = cv2.cvtColor(color, cv2.COLOR_RGB2BGR)
@@ -67,18 +69,18 @@ def simulate_robotic_movement(
 
 if __name__ == "__main__":
     # Simulate robotic movements on the mesh, estimate hole positions and record video
-    # print("\nSIDE SIMULATION:")
-    # simulate_robotic_movement(
-    #     num_steps=20,
-    #     camera_pose=SIDE_CAMERA_POSE,
-    #     light_pose=SIDE_LIGHT_POSE,
-    #     output_video=SIDE_SIMULATION_PATH,
-    # )
-
-    print("\nTOP SIMULATION:")
+    print("\nSIDE SIMULATION:")
     simulate_robotic_movement(
         num_steps=20,
-        camera_pose=TOP_CAMERA_POSE,
-        light_pose=TOP_LIGHT_POSE,
-        output_video=TOP_SIMULATION_PATH,
+        camera_pose=SIDE_CAMERA_POSE,
+        light_pose=SIDE_LIGHT_POSE,
+        output_video=SIDE_SIMULATION_PATH,
     )
+
+    # print("\nTOP SIMULATION:")
+    # simulate_robotic_movement(
+    #     num_steps=20,
+    #     camera_pose=TOP_CAMERA_POSE,
+    #     light_pose=TOP_LIGHT_POSE,
+    #     output_video=TOP_SIMULATION_PATH,
+    # )
