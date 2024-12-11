@@ -171,26 +171,30 @@ class CoverHandler:
         lines = cv2.HoughLinesP(edges, 1, np.pi/180, threshold=50, minLineLength=50, maxLineGap=10)
 
         if lines is not None:
-            shortest_line = None
-            min_length = float('inf')
+            longest_line = None
+            max_length = 0
+
+            # Convert angle range from radians to degrees
+            min_angle = -2.50
+            max_angle = -1.25
 
             for line in lines:
                 x1, y1, x2, y2 = line[0]
 
-                # Calculate angle with horizontal axis
-                angle = self._calculate_angle((x1, y1, x2, y2))
+                # Calculate angle
+                angle = self._calculate_angle(line[0])
 
-                # Check if line is within ±5 degrees of horizontal
-                if abs(angle) <= 5:
+                # Check if line is within specified angle range
+                if min_angle <= angle <= max_angle:
                     # Calculate line length
                     length = np.sqrt((x2 - x1)**2 + (y2 - y1)**2)
 
-                    # Update shortest line if this is shorter
-                    if length < min_length:
-                        min_length = length
-                        shortest_line = (x1 + x, y1 + y, x2 + x, y2 + y)
+                    # Update longest line if this is longer
+                    if length > max_length:
+                        max_length = length
+                        longest_line = (x1 + x, y1 + y, x2 + x, y2 + y)
 
-            return shortest_line
+            return longest_line
         return None
 
     def _calculate_angle(self, line: Tuple[int, int, int, int]) -> float:
@@ -285,11 +289,11 @@ class CoverHandler:
         else:
             print("[CoverHandler] Not enough holes detected.")
 
-    def get_left_hole(self) -> Optional[Tuple[int, int]]:
+    def get_left_hole(self) -> Optional[Tuple[int, int, int]]:
         """Return the coordinates of the left hole"""
         return self._left_hole
 
-    def get_right_hole(self) -> Optional[Tuple[int, int]]:
+    def get_right_hole(self) -> Optional[Tuple[int, int, int]]:
         """Return the coordinates of the right hole"""
         return self._right_hole
 

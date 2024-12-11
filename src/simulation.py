@@ -80,6 +80,53 @@ def compute_simplified_correction(
     )
 
 
+def calculate_perturbation_error(initial: Perturbation, estimated_correction: Perturbation) -> float:
+    """
+    Calculate relative error between estimated correction and theoretical correction (reverse of initial)
+
+    Args:
+        initial: Initial perturbation applied
+        estimated_correction: Estimated correction perturbation
+
+    Returns:
+        float: Relative error between 0 and 1, where 0 means perfect correction
+    """
+    # Theoretical correction should be the reverse of initial perturbation
+    theoretical_correction = Perturbation(
+        translation=-initial.translation,
+        rotation=np.array([*-initial.rotation[:3], initial.rotation[3]]),  # Inverse quaternion
+        rotation_point=initial.rotation_point
+    )
+
+    # Calculate translation error (Euclidean distance)
+    translation_error = np.linalg.norm(
+        estimated_correction.translation - theoretical_correction.translation
+    )
+
+    # Calculate rotation error (quaternion distance)
+    # Using dot product between quaternions: error = 1 - |q1·q2|
+    rotation_error = 1 - abs(np.dot(estimated_correction.rotation,
+                                  theoretical_correction.rotation))
+
+    # Calculate rotation point error
+    rotation_point_error = np.linalg.norm(
+        estimated_correction.rotation_point - theoretical_correction.rotation_point
+    )
+
+    # Combine errors with weights
+    w1, w2, w3 = 0.5, 0.5, 0.0  # Weights for translation, rotation, and rotation point
+    max_translation_error = 1.0  # Expected maximum translation error in units
+    max_rotation_point_error = 1.0  # Expected maximum rotation point error in units
+
+    relative_error = (
+        w1 * min(translation_error / max_translation_error, 1.0) +
+        w2 * rotation_error +
+        w3 * min(rotation_point_error / max_rotation_point_error, 1.0)
+    )
+
+    return min(max(relative_error, 0.0), 1.0)
+
+
 def render_all(scene: SceneHandler) -> Tuple[OpenCVImage, OpenCVImage, OpenCVImage] :
     # Top View rendering
     scene.set_camera_pose(TOP_CAMERA_POSE)
@@ -128,7 +175,7 @@ def simulate_robotic_movement(
 
         # Compile results
         roll = cover_handler.get_roll()
-        x_translation = np.array(rad_handler._hole)[0] - np.array(cover_handler._right_hole)[0]
+        x_translation = np.array(rad_handler._hole)[1] - np.array(cover_handler._right_hole)[1]
 
         print(f"Results {step}/{num_steps}:")
         print(f"Radiator Hole: {rad_handler._hole}")
@@ -144,6 +191,7 @@ def simulate_robotic_movement(
         )
         print(f"Initial Pertubation: {init_pertub}")
         print(f"Correction Matrix: {correction}")
+        print(f"Relative Error: {calculate_perturbation_error(init_pertub, correction):.4f}")
 
         scene.apply_perturbation(correction)
         rad_img, cover_img_top, cover_img_side = render_all(scene)
@@ -151,9 +199,10 @@ def simulate_robotic_movement(
         # video_writer.write(cercle_result.image)
 
         # Display simulation in real time
-        cv2.imshow("Result of Correction", cover_img_side.cv_image)
-        cv2.imshow("Result of Correction", cover_img_top.cv_image)
+        cv2.imshow("Result of Correction Side", cover_img_side.cv_image)
+        cv2.imshow("Result of Correction Top", cover_img_top.cv_image)
         cv2.waitKey(0)
+        cv2.destroyAllWindows()
 
         cv2.imwrite(f"{OUTPUT_PATH}/ResultSide.png", cover_img_side.cv_image)
         cv2.imwrite(f"{OUTPUT_PATH}/ResultTop.png", cover_img_top.cv_image)
