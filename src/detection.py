@@ -503,12 +503,12 @@ if __name__ == "__main__":
     scene.set_camera_pose(TOP_CAMERA_POSE)
     scene.set_light_pose(TOP_LIGHT_POSE)
 
-    # rad_img = scene.render(show_cov=False)
-    # rad_img = create_open_cv_image(rad_img)
-    # rad_handler = RadiatorHandler(rad_img)
+    rad_img = scene.render(show_cov=False)
+    rad_img = create_open_cv_image(rad_img)
+    rad_handler = RadiatorHandler(rad_img)
 
-    # rad_handler.process_image()
-    # rad_handler.display_result()
+    rad_handler.process_image()
+    rad_handler.display_result()
 
     cover_img_top = scene.render(show_cov=True)
     cover_img_top = create_open_cv_image(cover_img_top)
