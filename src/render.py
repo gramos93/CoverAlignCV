@@ -148,12 +148,12 @@ def granular_perturbation(
 
 @dataclass
 class SceneConfig:
-    viewport_width: int = 640
-    viewport_height: int = 480
+    viewport_width: int = 1280
+    viewport_height: int = 720
     bg_color: Tuple = (0.0, 0.0, 0.0, 0.0)
     light_intensity: float = 4.0
     light_color: Tuple = (1.0, 1.0, 1.0)
-    camera_fov: float = np.pi / 3.0
+    camera_fov: float = np.pi / 5.0
 
 
 class SceneHandler:

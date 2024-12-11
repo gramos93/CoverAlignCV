@@ -37,7 +37,12 @@ class RadiatorHandler:
         blurred = self.image.gray[y:y + h, x:x + w]
         edges = cv2.Canny(blurred, 50, 150)
 
-        lines = cv2.HoughLinesP(edges, 1, np.pi/180, threshold=50, minLineLength=50, maxLineGap=10)[:, 0, :].tolist()
+        lines = cv2.HoughLinesP(edges, 1, np.pi/180, threshold=50, minLineLength=50, maxLineGap=10)
+        if lines is None:
+            return None
+        else:
+            lines = lines.reshape(-1, 4)
+
         lines = sorted(
             lines,
             key=lambda x: min(x[1], x[3]) if not vertical else min(x[0], x[2]),
@@ -99,7 +104,7 @@ class RadiatorHandler:
                 cv2.circle(self.processed_image, self._intersection, r, (0, 255, 0), 1)
 
         else:
-            print("Lines or hole not found")
+            print("[RadiatorHandler] Lines or hole not found")
 
     def calculate_intersection(self, vertical_line, horizontal_line) -> Optional[Tuple[int, int]]:
         """Return the intersection point of vertical and horizontal lines"""
@@ -236,7 +241,7 @@ class CoverHandler:
         circles = cv2.HoughCircles(
             self.image_top.gray[y:y + h, x:x + w],
             cv2.HOUGH_GRADIENT,
-            dp=1.2,
+            dp=h/16,
             minDist=20,
             param1=100,
             param2=30,
