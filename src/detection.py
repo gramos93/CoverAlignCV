@@ -16,9 +16,9 @@ from render import (
 
 @dataclass
 class RadDetConfig:
-    vertical_line_zone: Tuple[int, int, int, int] = (170, 130, 30, 250)
-    horizontal_line_zone: Tuple[int, int, int, int] = (170, 130, 175, 45)
-    hole_zone: Tuple[int, int, int, int] = (312, 231, 35, 35)
+    vertical_line_zone: Tuple[int, int, int, int] = (240, 75, 60, 345)
+    horizontal_line_zone: Tuple[int, int, int, int] = (240, 75, 410, 75)
+    hole_zone: Tuple[int, int, int, int] = (635, 350, 60, 75)
 
 
 class RadiatorHandler:
@@ -127,22 +127,10 @@ class RadiatorHandler:
 
     def display_result(self, img: Optional[np.ndarray] = None) -> None:
         """Display the processed image with detections"""
-        RESIZE_MAX_HEIGHT = 800
-        RESIZE_MAX_WIDTH = 1200
 
         img = img if (img is not None) else self.processed_image
-        height, width = img.shape[:2]
 
-        if height > RESIZE_MAX_HEIGHT or width > RESIZE_MAX_WIDTH:
-            scale = min(
-                RESIZE_MAX_HEIGHT / height,
-                RESIZE_MAX_WIDTH / width
-            )
-            dim = (int(width * scale), int(height * scale))
-            resized = cv2.resize(img, dim)
-            cv2.imshow("Detection Result", resized)
-        else:
-            cv2.imshow("Detection Result", img)
+        cv2.imshow("Detection Result", img)
         cv2.waitKey(0)
         cv2.destroyAllWindows()
 
@@ -153,10 +141,10 @@ class CoverImage:
 
 @dataclass
 class CoverDetConfig:
-    holes_zone: Tuple[int, int, int, int] = (170, 220, 180, 50)
-    edge_zone: Tuple[int, int, int, int] = (130, 245, 220, 25)
-    min_hole_distance: int = 100
-    max_hole_distance: int = 400
+    holes_zone: Tuple[int, int, int, int] = (240, 370, 450, 100)
+    edge_zone: Tuple[int, int, int, int] = (140, 390, 570, 40)
+    min_hole_distance: int = 250
+    max_hole_distance: int = 450
 
 class CoverHandler:
     def __init__(self, image_top: OpenCVImage, image_side: OpenCVImage, config: CoverDetConfig = CoverDetConfig()):
@@ -242,11 +230,11 @@ class CoverHandler:
             self.image_top.gray[y:y + h, x:x + w],
             cv2.HOUGH_GRADIENT,
             dp=h/16,
-            minDist=20,
+            minDist=self.config.min_hole_distance,
             param1=100,
             param2=30,
-            minRadius=0,
-            maxRadius=10,
+            minRadius=5,
+            maxRadius=13,
         )
 
         holes = []
@@ -320,23 +308,9 @@ class CoverHandler:
 
     def display_result(self) -> None:
         """Display the processed image with detections"""
-        RESIZE_MAX_HEIGHT = 800
-        RESIZE_MAX_WIDTH = 1200
 
-        height, width = self.processed_image.top.shape[:2]
-        if height > RESIZE_MAX_HEIGHT or width > RESIZE_MAX_WIDTH:
-            scale = min(
-                RESIZE_MAX_HEIGHT / height,
-                RESIZE_MAX_WIDTH / width
-            )
-            dim = (int(width * scale), int(height * scale))
-            resized_top = cv2.resize(self.processed_image.top, dim)
-            resized_side = cv2.resize(self.processed_image.side, dim)
-            cv2.imshow("Cover Detection Top Result", resized_top)
-            cv2.imshow("Cover Detection Side Result", resized_side)
-        else:
-            cv2.imshow("Cover Detection Top Result", self.processed_image.top)
-            cv2.imshow("Cover Detection Side Result", self.processed_image.side)
+        cv2.imshow("Cover Detection Top Result", self.processed_image.top)
+        cv2.imshow("Cover Detection Side Result", self.processed_image.side)
         cv2.waitKey(0)
         cv2.destroyAllWindows()
 
