@@ -4,7 +4,7 @@ import numpy as np
 import pyrender
 import trimesh
 from PIL import Image
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 COUVERCLE_PATH = "../assets/3dmodels/couvercle.stl"
@@ -74,27 +74,53 @@ def quaternion_multiply(q1, q2):
     )
 
 
+def quaternion_rotate(v: np.ndarray, q: np.ndarray) -> np.ndarray:
+    """
+    Rotate a vector v by a quaternion q.
+
+    :param v: 3D vector to rotate
+    :param q: quaternion [x,y,z,w]
+    :return: rotated vector
+    """
+    # Convert vector to pure quaternion
+    v_quat = np.array([v[0], v[1], v[2], 0.0])
+
+    # Compute q * v * q^-1
+    q_inv = np.array([-q[0], -q[1], -q[2], q[3]])  # conjugate
+    temp = quaternion_multiply(q, v_quat)
+    rotated = quaternion_multiply(temp, q_inv)
+
+    return rotated[0:3]  # Return just the vector part
+
+
+class RotationAxis:
+    """Defines a rotation axis in 3D space using a point and direction"""
+    point = np.array([0.0, 0.0, -1.0])  # Point that the axis passes through
+    direction = np.array([1.0, 0.0, 0.0])  # Direction vector of the axis (+X)
+
+
 @dataclass
 class PerturbationConfig:
     # Translation ranges per axis (None to disable perturbation on that axis)
-    translation_x_range: Optional[Tuple[float, float]] = (0, 0.02)
+    translation_x_range: Optional[Tuple[float, float]] = (-0.02, 0.0)
     translation_y_range: Optional[Tuple[float, float]] = None
     translation_z_range: Optional[Tuple[float, float]] = None
 
-    # Rotation ranges per axis in radians (None to disable rotation around that axis)
-    rotation_x_range: Optional[Tuple[float, float]] = None
-    rotation_y_range: Optional[Tuple[float, float]] = None
-    rotation_z_range: Optional[Tuple[float, float]] = (0, np.pi/36)
+    # Rotation configuration
+    rotation_axis: Optional[RotationAxis] = RotationAxis()  # Default X axis through origin
+    rotation_range: Optional[Tuple[float, float]] = (0.0, -0.0872665/2)  # 2.5 deg
+
 
 def granular_perturbation(
     node: pyrender.Node,
     config: PerturbationConfig
 ) -> None:
     """
-    Apply controlled random translation and rotation to the pyrender node with granular control per axis.
+    Apply controlled random translation and rotation to the pyrender node.
+    Translation has granular control per axis, rotation uses a single axis.
 
     :param node: The pyrender Node to perturb
-    :param config: PerturbationConfig object containing the ranges for each axis
+    :param config: PerturbationConfig object containing the ranges and rotation axis
     """
     # Random translation
     translation = np.zeros(3)
@@ -110,38 +136,44 @@ def granular_perturbation(
     else:
         node.translation = node.translation + translation
 
-    # Random rotation - one rotation per enabled axis
-    combined_quaternion = np.array([0.0, 0.0, 0.0, 1.0])  # Identity quaternion
+    # Single axis rotation
+    if config.rotation_axis is not None and config.rotation_range is not None:
+        # Get current position of the node
+        current_position = node.translation if node.translation is not None else np.zeros(3)
 
-    for i, range_tuple in enumerate([config.rotation_x_range,
-                                   config.rotation_y_range,
-                                   config.rotation_z_range]):
-        if range_tuple is not None:
-            min_range, max_range = range_tuple
-            # Create basis vector for this axis
-            axis = np.zeros(3)
-            axis[i] = 1.0
+        # 1. Transform the node position relative to the rotation axis
+        relative_pos = current_position - config.rotation_axis.point
 
-            # Random angle within range
-            angle = np.random.uniform(min_range, max_range)
+        # 2. Normalize rotation axis direction
+        rotation_direction = config.rotation_axis.direction / np.linalg.norm(config.rotation_axis.direction)
 
-            # Convert to quaternion
-            half_angle = angle / 2.0
-            quat = np.zeros(4)
-            quat[i] = np.sin(half_angle)  # x, y, or z component
-            quat[3] = np.cos(half_angle)  # w component
+        # 3. Random angle within range
+        min_range, max_range = config.rotation_range
+        angle = np.random.uniform(min_range, max_range)
 
-            # Normalize quaternion
-            quat /= np.linalg.norm(quat)
+        # 4. Convert to quaternion
+        half_angle = angle / 2.0
+        qx = rotation_direction[0] * np.sin(half_angle)
+        qy = rotation_direction[1] * np.sin(half_angle)
+        qz = rotation_direction[2] * np.sin(half_angle)
+        qw = np.cos(half_angle)
 
-            # Combine with previous rotations
-            combined_quaternion = quaternion_multiply(quat, combined_quaternion)
+        # Create and normalize quaternion
+        quaternion = np.array([qx, qy, qz, qw])
+        quaternion /= np.linalg.norm(quaternion)
 
-    if node.rotation is None:
-        node.rotation = combined_quaternion
-    else:
-        # Combine with existing rotation
-        node.rotation = quaternion_multiply(combined_quaternion, node.rotation)
+        # 5. Apply rotation to the relative position
+        rotated_pos = quaternion_rotate(relative_pos, quaternion)
+
+        # 6. Transform back to world coordinates
+        new_position = rotated_pos + config.rotation_axis.point
+
+        # Update node position and rotation
+        node.translation = new_position
+        if node.rotation is None:
+            node.rotation = quaternion
+        else:
+            node.rotation = quaternion_multiply(quaternion, node.rotation)
 
 
 @dataclass
@@ -235,7 +267,7 @@ class SceneHandler:
 
     def apply_perturbation(
         self,
-        config: Optional[PerturbationConfig] = None,
+        config: PerturbationConfig = PerturbationConfig(),
     ) -> None:
         """
         Apply random perturbation to the meshes using granular control configuration.
@@ -244,11 +276,9 @@ class SceneHandler:
                     If None, uses default configuration.
         """
         if self.cov_mesh_node:
-            # Use default config if none provided
-            if config is None:
-                config = PerturbationConfig()
-
             granular_perturbation(self.cov_mesh_node, config)
+        else:
+            print("[ScenerHandler] No cover mesh node found to apply perturbation.")
 
     def render(self, show_cov: bool = True) -> np.ndarray:
         """Render the scene"""
