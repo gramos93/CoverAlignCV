@@ -52,7 +52,7 @@ def compute_simplified_correction(
     # Step 2: Convert pixel translation to world units and create translation vector
     # Use positive delta_x_world to reverse the detected negative translation
     delta_x_world = delta_x_pixels * gsd
-    translation = np.array([delta_x_world, 0.0, 0.0])  # Changed sign from - to +
+    translation = np.array([-delta_x_world, 0.0, 0.0])
 
     # Step 3: Convert roll angle from degrees to radians
     # Negate the angle to reverse the rotation
@@ -152,7 +152,12 @@ def simulate_robotic_movement(
 
         # Display simulation in real time
         cv2.imshow("Result of Correction", cover_img_side.cv_image)
+        cv2.imshow("Result of Correction", cover_img_top.cv_image)
         cv2.waitKey(0)
+
+        cv2.imwrite(f"{OUTPUT_PATH}/ResultSide.png", cover_img_side.cv_image)
+        cv2.imwrite(f"{OUTPUT_PATH}/ResultTop.png", cover_img_top.cv_image)
+
         # if cv2.waitKey(10) & 0xFF == ord("q"):
         #     break
 
