@@ -69,12 +69,12 @@ class RadiatorHandler:
         circles = cv2.HoughCircles(
             self.image.gray[y:y + h, x:x + w],
             cv2.HOUGH_GRADIENT,
-            dp=h/8,
-            minDist=20,
+            dp=h/15,
+            minDist=2,
             param1=100,
             param2=30,
-            minRadius=0,
-            maxRadius=0
+            minRadius=7,
+            maxRadius=10
         )
 
         if circles is not None:
