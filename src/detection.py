@@ -125,6 +125,12 @@ class RadiatorHandler:
         cv2.waitKey(0)
         cv2.destroyAllWindows()
 
+    def save_result(self, img: Optional[np.ndarray] = None) -> None:
+        """Save the processed image with detections"""
+
+        img = img if (img is not None) else self.processed_image
+        cv2.imwrite("output/Radiator_Detection_Result.png", img)
+
 @dataclass
 class CoverImage:
     top: np.ndarray
@@ -313,6 +319,11 @@ class CoverHandler:
         cv2.waitKey(0)
         cv2.destroyAllWindows()
 
+    def save_result(self) -> None:
+        """Save the processed image with detections"""
+
+        cv2.imwrite("output/Cover_Detection_Top_Result.png", self.processed_image.top)
+        cv2.imwrite("output/Cover_Detection_Side_Result.png", self.processed_image.side)
 
 if __name__ == "__main__":
 
@@ -336,6 +347,7 @@ if __name__ == "__main__":
 
     rad_handler.process_image()
     rad_handler.display_result()
+    rad_handler.save_result()
 
     cover_img_top = scene.render(show_cov=True)
     cover_img_top = create_open_cv_image(cover_img_top)
@@ -348,3 +360,4 @@ if __name__ == "__main__":
     cover_handler = CoverHandler(cover_img_top, cover_img_side)
     cover_handler.process_image()
     cover_handler.display_result()
+    cover_handler.save_result()
