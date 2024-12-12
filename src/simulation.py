@@ -1,6 +1,17 @@
-import time
 import numpy as np
 from typing import Tuple
+import matplotlib.pyplot as plt
+
+plt.style.use('seaborn-v0_8-paper')
+plt.rcParams.update({
+    "font.family": "serif",
+    "font.size": 10,
+    "axes.labelsize": 10,
+    "axes.titlesize": 10,
+    "xtick.labelsize": 9,
+    "ytick.labelsize": 9,
+})
+
 import cv2
 from preprocessing import OpenCVImage, create_open_cv_image
 from detection import RadiatorHandler, CoverHandler
@@ -9,7 +20,6 @@ from render import (
     PerturbationConfig,
     SceneHandler,
     RotationAxis,
-    apply_perturbation,
     COUVERCLE_PATH,
     BOITIER_PATH,
     OUTPUT_PATH,
@@ -18,6 +28,7 @@ from render import (
     TOP_LIGHT_POSE,
     SIDE_LIGHT_POSE,
     sample_perturbation,
+    quaternion_multiply,
 )
 
 TOP_SIMULATION_PATH = f"{OUTPUT_PATH}/robotic_top_simulation.mp4"
@@ -160,7 +171,7 @@ def simulate_robotic_movement(
     # Video file setup
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
     video_writer = cv2.VideoWriter(output_video, fourcc, fps=1, frameSize=(1280, 720))
-    for step in range(num_steps):
+    for step in range(1, num_steps + 1):
 
         # Render all views
         rad_img, cover_img_top, cover_img_side = render_all(scene)
@@ -220,9 +231,126 @@ def simulate_robotic_movement(
 
     return correction_error
 
+def simulate_correction_convergence(num_steps=10) -> None:
+    """
+    Simulates multiple correction steps and plots the error evolution.
+    Records translation and rotation errors at each step.
+    """
+    scene = SceneHandler.from_stl_files(COUVERCLE_PATH, BOITIER_PATH)
+
+    # Initialize arrays to store errors
+    translation_errors = []
+    rotation_errors = []
+    correction_errors = []
+    steps = []
+
+    # Apply initial perturbation
+    init_pertub = sample_perturbation(PerturbationConfig())
+    scene.apply_perturbation(init_pertub)
+    print(f"Initial Perturbation:\n{init_pertub}")
+
+    # Initialize cumulative correction
+    cumulative_correction = Perturbation(
+        translation=np.zeros(3),
+        rotation=np.array([0.0, 0.0, 0.0, 1.0]),  # Identity quaternion
+        rotation_point=np.zeros(3)
+    )
+
+    for step in range(1, num_steps + 1):
+        print(f"\nStep {step}/{num_steps}:")
+
+        # Render views and process images
+        rad_img, cover_img_top, cover_img_side = render_all(scene)
+
+        # Process images
+        rad_handler = RadiatorHandler(rad_img)
+        rad_handler.process_image()
+
+        cover_handler = CoverHandler(cover_img_top, cover_img_side)
+        cover_handler.process_image()
+
+        # Get measurements
+        roll = cover_handler.get_roll()
+        x_translation = np.array(rad_handler._hole)[1] - np.array(cover_handler._right_hole)[1]
+
+        # Compute correction for this step
+        step_correction = compute_simplified_correction(
+            x_translation, roll, RotationAxis()
+        )
+        print(f"Step Correction: {step_correction}")
+        print(f"Translation Error: {x_translation:.2f} px")
+        print(f"Rotation Error: {roll:.2f} deg")
+
+        # Update cumulative correction
+        # Combine translations
+        cumulative_correction.translation += step_correction.translation
+
+        # Combine rotations using quaternion multiplication
+        cumulative_correction.rotation = quaternion_multiply(
+            step_correction.rotation,
+            cumulative_correction.rotation
+        )
+
+        # The rotation point remains the same as we're using the same axis
+
+        # Calculate and store errors
+        correction_error = calculate_perturbation_error(init_pertub, cumulative_correction)
+        translation_errors.append(abs(x_translation))
+        rotation_errors.append(abs(roll))
+        correction_errors.append(correction_error)
+        steps.append(step)
+
+        print(f"Cumulative Correction: {cumulative_correction}")
+        print(f"Cumulative Correction Error: {correction_error:.4f}")
+
+        # Apply step correction
+        scene.apply_perturbation(step_correction)
+
+    # Create plot with adjusted figure size for LaTeX document
+    fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(12, 4))
+
+    # Plot translation error
+    ax1.plot(steps, translation_errors, color='black', markersize=4)
+    ax1.set_title('Erreur de translation vs. Itération', pad=10)
+    ax1.set_xlabel('Itération')
+    ax1.set_ylabel('Erreur de translation (pixels)')
+    ax1.grid(True, linestyle='--', alpha=0.7)
+
+    # Plot rotation error
+    ax2.plot(steps, rotation_errors, color='black', markersize=4)
+    ax2.set_title('Erreur de rotation vs. Itération', pad=10)
+    ax2.set_xlabel('Itération')
+    ax2.set_ylabel('Erreur de rotation (degrees)')
+    ax2.grid(True, linestyle='--', alpha=0.7)
+
+    # Plot correction error
+    ax3.plot(steps, correction_errors, color='black', markersize=4)
+    ax3.set_title('Erreur relatif vs Perturbation initiale', pad=10)
+    ax3.set_xlabel('Itération')
+    ax3.set_ylabel('Erreur de correction')
+    ax3.grid(True, linestyle='--', alpha=0.7)
+
+    # Adjust layout with tighter spacing
+    plt.tight_layout(pad=1.5)
+
+    # Save with higher DPI for better quality
+    plt.savefig(f"{OUTPUT_PATH}/convergence_plot.pdf",
+                format='pdf',
+                dpi=300,
+                bbox_inches='tight')
+    plt.savefig(f"{OUTPUT_PATH}/convergence_plot.png",
+                dpi=300,
+                bbox_inches='tight')
+    plt.show()
+
+    # Cleanup
+    scene.cleanup()
+
 if __name__ == "__main__":
     # Simulate robotic movements on the mesh, estimate hole positions and record video
-    _ = simulate_robotic_movement(
-        num_steps=1,
-        output_video=SIDE_SIMULATION_PATH,
-    )
+    # _ = simulate_robotic_movement(
+    #     num_steps=1,
+    #     output_video=SIDE_SIMULATION_PATH,
+    # )
+
+    simulate_correction_convergence(num_steps=10)
