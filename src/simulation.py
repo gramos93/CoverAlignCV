@@ -306,6 +306,10 @@ def simulate_correction_convergence(num_steps=10) -> None:
         # Apply step correction
         scene.apply_perturbation(step_correction)
 
+    rad_img, cover_img_top, cover_img_side = render_all(scene)
+    cv2.imwrite(f"{OUTPUT_PATH}/ResultSide.png", cover_img_side.cv_image)
+    cv2.imwrite(f"{OUTPUT_PATH}/ResultTop.png", cover_img_top.cv_image)
+
     # Create plot with adjusted figure size for LaTeX document
     fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(12, 4))
 
